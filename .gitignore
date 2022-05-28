@@ -1,0 +1,9 @@
+!.gitignore
+
+!README.md
+!*.py
+!*.r
+!*.sh
+!*.yaml
+!*.smk
+!workflow/snakefile

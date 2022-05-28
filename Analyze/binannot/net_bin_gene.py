@@ -1,0 +1,1 @@
+/home/hwrn/Templates/Analyze/2022/01/x10.py
