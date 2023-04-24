@@ -1,4 +1,4 @@
-!.gitignore
+!./.gitignore
 
 !README.md
 !*.py
@@ -6,4 +6,5 @@
 !*.sh
 !*.yaml
 !*.smk
+!*.Rmd
 !workflow/snakefile

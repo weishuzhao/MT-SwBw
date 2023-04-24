@@ -1,38 +1,26 @@
 <!--
  * @Date: 2021-09-15 20:57:09
- * @LastEditors: Hwrn
- * @LastEditTime: 2021-09-15 21:14:11
+ * @LastEditors: Hwrn hwrn.aou@sjtu.edu.cn
+ * @LastEditTime: 2023-04-24 21:54:23
  * @FilePath: /2021_09-MT10kSW/README.md
  * @Description:
 -->
-
+Prokaryotic communities reveal distinct seawater-sediment interaction processes at the slope and bottom in the Challenger Deep
 ===
 
+- Analysis for Prokaryotic communities reveal distinct seawater-sediment interaction processes at the slope and bottom in the Challenger Deep
+
 ---
-## log
+## Description
+- This reposity contain files generate from metagenomic data and tables for figures and other conclusions in the manuscript.
+
+## Run
 ```bash
-mkdir -p Analyze/alphadiv
-
-
-declare KAIJU_DB=~/Data/Database/Kaiju/nr_euk_20200525/
-
-declare samples=(`cat 00_data/sample_meta.tsv |awk '! /^#/ {print $1}'`)
-kaiju_outs=""
-for i in ${samples[@]}
-do
-    kaiju_outs+=Pipe/${i}-megahit/01_alpha_div/kaiju-${i}-megahit.out" "
-done
-
-conda activate python36
-kaiju2table \
-    -t ${KAIJU_DB}/nodes.dmp \
-    -n ${KAIJU_DB}/names.dmp \
-    -o Analyze/alphadiv/kaiju.order.tsv -r order \
-    -l superkingdom,phylum,class,order \
-    ${kaiju_outs} \
-    -v 2>&1 |tee Oerr/01.3_order-kaiju2table.log
-
+# conda and snakemake required
+python -m snakemake all --use-conda
 ```
+- files are kept in [`data_table.zip`](data_table.zip) and can be unzipped before use it.
+- information of software and version are shown in manuscript.
 
 
 # [***$\not$<!-- @Hwrn -->*~~`\`~~**](README.md)

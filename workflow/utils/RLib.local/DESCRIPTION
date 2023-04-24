@@ -1,0 +1,12 @@
+Package: RLib.local
+Type: Package
+Title: Useful R function in this project
+Version: 0.0.1
+Author: Hwrn.aou
+Maintainer: Hwrn.aou <Hwrn.aou@sjtu.edu.cn>
+Description:
+    This package contains some useful R functions.
+LazyData: yes
+License: GPL-3
+Encoding: UTF-8
+RoxygenNote: 7.2.3

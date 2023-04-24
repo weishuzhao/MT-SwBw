@@ -1,0 +1,311 @@
+<!--
+ * @Date: 2022-08-13 17:33:57
+ * @LastEditors: Hwrn
+ * @LastEditTime: 2022-08-19 08:51:18
+ * @FilePath: /2021_09-MT10kSW/workflow/others/check_results_gene.Rmd
+ * @Description:
+-->
+Results
+===
+
+## Data Import and prepare
+
+```{r setup, include=FALSE}
+knitr::opts_knit$set(root.dir = "~/Work/2021_09-MT10kSW/")
+```
+
+```{r config, message=FALSE, warning=FALSE}
+source("workflow/utils/RLib.local/R/init.r", chdir = TRUE)
+```
+
+```{r load_data, cache=TRUE, dependson=c("config")}
+Wtdb_abd = stringr::str_glue("Wtdb.relative_abundance.tsv") %>% file_path$file_path$results() %>% as.character
+
+Stdb = load__Stdb()
+Wtdb = load__Wtdb()
+genome_taxonomy = load__genome_taxonomy(Stdb, Wtdb)
+Wtdb.relative_abundance = get_relative_abundance(Wtdb_abd, genome_taxonomy)
+
+key_genes = load__key_genes()
+gene_ko_tpm = load__gene_ko_tpm()
+TOTAL_GENE_NUM = gene_ko_tpm$KO %>% unique %>% length %>% {. * 2}
+genomeko = load__genomeko()
+```
+
+```{r ko_tpm_signif, cache=TRUE, warning=FALSE, dependson=c("load_data")}
+tpm.key =
+  gene_ko_tpm %>%
+  merge(key_genes, by = "KO") %>%
+  {.$Site = .$Layer %>% gsub("^(.+)\\.\\.(.+)$", "\\1", .); .} %>%
+  {.$Pathway = factor(.$Pathway, levels = levels(key_genes$Pathway)); .} %>%
+  merge(site_group) %>%
+  merge(sample_meta[c("Location", "Group")] %>% unique) %>%
+  {.$Location = factor(.$Location, levels = c("Slope", "Bottom")); .}
+
+tpm_key.signif =
+  tpm.key %>%
+  location.group.signif("KO", "TPM", "Location", "Group", TOTAL_GENE_NUM) %>%
+  merge(key_genes, by = "KO") %>%
+  .[.$p.value.char != "-",]
+
+.tpm_key.signif.sum_mean =
+  tpm.key %>%
+  group_by(KO, Location, Group, Layer) %>%
+  summarise(TPM = sum(TPM)) %>%
+  group_by(KO, Location, Group) %>%
+  summarise(TPM = mean(TPM)) %>%
+  {
+    merge(.[.$Group %in% c("Sw", "Bw"), ], .[.$Group %in% c("Ss", "Bs"), ],
+          by = c("KO", "Location"),
+          suffixes = c(".w", ".s"))
+  } %>%
+  merge(tpm_key.signif)
+tpm_key.signif.sum_mean =
+  .tpm_key.signif.sum_mean %>%
+  .[.$New == "False",] %>%
+  .[c("Location", "KO", "Label", "Pathway", "TPM.w", "TPM.s", "p.value.char", "p.value.adj")]
+
+```
+
+```{r classlocko_pct, cache=TRUE, dependson=c("load_data")}
+annotation_genomes =
+  get_taxon_group(Wtdb.relative_abundance, "Genome", "Group") %>%
+  {rownames(.) = .$Genome %>% gsub("^(.+)$", "\\1.fa", .); .$Genome <- NULL; .}
+
+genomeko.key =
+  genomeko[key_genes$KO %>% as.character, ] %>%
+  .[apply(., 1, sum) > 0, apply(., 2, sum) > 0]
+
+get_classlocko_ext <- function(Pathway = c(), Label = c(), New = c("False"), Class = c()) {
+  annotation_genomes_class =
+    merge(Wtdb[c("Genome", "Classification")], annotation_genomes,
+          by.x = "Genome", by.y = 0) %>%
+    {
+      Classification = .$Classification
+      .$Class = Classification %>% taxon.split(1, 3)
+      .[c("Row.names", "Classification")] <- NULL
+      .$Classification = Classification %>% taxon.split(1, 7)
+      .
+    } %>%
+    {
+      if (length(Class) == 0) .[,] else .[.$Class %in% Class,]
+    }
+
+  key_genes %>%
+    {
+      if (length(New) == 0) .[,] else .[.$New %in% New,]
+    } %>%
+    {
+      if (length(Pathway) == 0) .[,] else .[.$Pathway %in% Pathway,]
+    } %>%
+    {
+      if (length(Label) == 0) .[,] else .[.$Label %in% Label,]
+    } %>%
+    {data.frame(t(genomeko.key))[annotation_genomes_class$Genome, ][.$KO]} %>%
+    {.$Psudo <- 0; .} %>% .[apply(., 1, max) > 0, ] %>%
+    {.$Psudo <- 1; .} %>% .[, apply(., 2, max) > 0] %>% {.$Psudo <- NULL; .} %>%
+    {
+      colnames(.) =
+        colnames(.) %>% sapply(. %>% {as.character(key_genes$Label)[which(. == key_genes$KO)]})
+      .
+    } %>%
+    merge(annotation_genomes_class, by.x = 0, by.y = "Genome") %>%
+    .[.$Classification %>% order,] %>%
+    {.[c("Row.names")] <- NULL; .} %>%
+    {rownames(.) <- NULL; .}
+}
+```
+
+
+## Results and discussion
+
+- > 相较类群组成, 在不同环境中均出现的基因占比最大, 是有文献支持的 (Fig.S3 Venn)
+- > 先进行概述：CO2固定、复杂有机碳降解、N、S、重金属等
+
+### Carbon fixation
+
+```{r dependson=c("config")}
+get_classlocko_ext(Pathway = c("3HP-4HB"))
+tpm_key.signif.sum_mean %>% .[.$Pathway == "3HP-4HB",]
+```
+
+- Key genes of 3PH-4HB pathway (3hpcs, 4hbcl) are only obtained in `r unique(get_classlocko_ext(Label = c("3hpcs", "4hbcl"))$Class)`, which is widespread across MT.
+    - > 仅在坡上, 这两个基因出现子同一个 MAG 中.
+    - > 从丰度上看, 坡上沉积物中的这两个基因丰度最高, 而沟底水样中的基因丰度比沉积物或坡上低了接近两个数量级.
+
+```{r dependson=c("config")}
+get_classlocko_ext(Pathway = c("rTCA"))
+tpm_key.signif.sum_mean %>% .[.$Pathway == "rTCA",]
+```
+
+- Key genes of rTCA (aclA, ccsA) mostly found in Nitrospinia of Nitrospinota, while aclA is only find in Nitrospiria in water environments. this indicates a important role of carbon fixation of Nitrospinia in the sediment, and the intercellular cooperation for rTCA cycling in the water.
+    - > 我们研究中超过一半的 Nitrospinia 含有这两个基因 (讨论 hints)
+        Nitrospina 主要局限于海洋环境, 常在海水中检测到, 但在沟底海水中缺少, 可能说明的原因...
+        [The genome of Nitrospina gracilis illuminates the metabolism and evolution of the major marine nitrite oxidizer](https://doi.org/10.3389/fmicb.2013.00027)
+            令人惊讶的是，Nitrospina采用rTCA循环来完成这项任务。本一氧化碳2固定途径在好氧生物体中是意想不到的，因为它的两个关键酶属于2-氧代酸氧化还原酶（OR）家族，其成员通常具有高氧敏感性（Berg，2011）。然而，嗜热氢杆菌具有不寻常的五亚基类型的2-氧代戊二酸：铁氧化还原素（OGOR）和丙酮酸：铁氧化还原酶（POR），它们在氧化条件下具有功能（Yoon等人，1996，1997）
+
+```{r dependson=c("config")}
+get_classlocko_ext(Label = c("prkB", "cbbL", "cbbS"), New = c())
+.tpm_key.signif.sum_mean %>% .[.$Label %in% c("prkB", "cbbL", "cbbS"),]
+```
+
+- On the contrary, key genes in CBB pathway (prkB) is abundant, and shared in various strains, mainly in Gammaproteobacteria.
+
+
+### 复杂有机碳降解
+
+- > (介绍有关复杂有机碳降解的情况) 深渊中营养来源匮乏, 主要来自上层有机质沉降,
+    因此在这里关注了深渊中难降解有机质的降解能力
+
+```{r dependson=c("config")}
+tpm_key.signif.sum_mean %>% .[.$Pathway == "Alkane",]
+get_classlocko_ext(Label = c("alkM"), New = c())
+get_classlocko_ext(Label = c("ladA", "luxA"))
+```
+- For alkane degradation (相关内容: ~~蛇纹石化~~ 有机质沉降到沟底, 其他地方较少),
+    alkM is the most abundant alkane monooxygenase in bottom and sediment water,
+    while ladA is also abundant.
+- Gens annotated as alkM have been found in various Proteobacteria, Myxococcota, and also found in Poseidoniales in Thermoplasmatota, which is mostly found in only bottom water.
+    However, genomes containing ladA can be found in both bottom and slope water,
+    and more abundant in slope water.
+
+
+```{r dependson=c("config")}
+tpm_key.signif.sum_mean %>% .[.$Pathway == "Plastic degradation",]
+get_classlocko_ext(Pathway = "Plastic degradation", New = c())
+```
+- > 许多与塑料降解相关的基因的丰度均较高, 尤其在沟底富集
+    (这里的基因一部分来自梁博高压培养结果, 属于底物更广泛的氧化酶? 不那么 specific).
+    > [Understanding plastic degradation and microplastic formation in the environment: A review](https://doi.org/10.1016/j.envpol.2021.116554) 一些作品研究了海洋沉积物中塑料的降解。 从海底收集的PET瓶在大约15年内保持稳健，之后观察到天然官能团显着减少（Ioakeimidis等人，2016）。 在Eckernförde Bay的氧化和缺氧沉积物中孵育的PE载体袋在98天内没有显示出生物降解的迹象（Nauendorf等人，2016）。在模拟水柱和海底条件下暴露一年，塑料没有显示出明显的失重趋势，但羰基和结晶指数的变化表明存在早期降解迹象（Beltrán-Sanahuja等人，2020）。由于免受紫外线，低温，低氧和缓慢的生物降解，塑料在海底和海洋沉积物中可能非常持久。
+
+    同时, 这些基因在各个 class 中都广泛存在. (要么说明这些塑料降解基因是假阳性, 要么说明深渊中这些基因都具有降解能力)
+
+
+```{r dependson=c("config")}
+tpm_key.signif.sum_mean %>% .[.$Pathway == "Aromatic",]
+get_classlocko_ext(Pathway = c("Aromatic"), Class = c("Archaea;Nanoarchaeota;Nanoarchaeia",
+                                                      "Archaea;Thermoplasmatota;Poseidoniia_A",
+                                                      "Archaea;Thermoproteota;Nitrososphaeria"))
+#tpm_key.signif.sum_mean %>% .[.$Label %in% c("boxB", "hcrA"), ]
+#get_classlocko_ext(Label = c("boxB", "hcrA"))
+```
+
+- 8 Archaea in this study obtained the potential to utilize aromatic components.
+    - Four Poseidoniales encode genes boxB and hcrA, have the potential to degrade benzoyl.
+    - All these Poseidoniales can be found in water.
+    - However, boxB and hcrA are more abundant in sediment and slope water samples.
+- Several gene, such as catA and catC,
+    are found to be widespread in Bacteria and Archaea genomes,
+    and have high abundance in every environmets.
+    However, catA is more abundant in water samples,
+    while catC have much higher abundance in sediment samples followed by slope water samples.
+- Genes badH and benA are more abundant only bottom,
+    indicating a functional differentiation and nutrient difference between environment.
+
+```{r dependson=c("config")}
+tpm_key.signif.sum_mean %>% .[.$Pathway == "Complex sugar",]
+get_classlocko_ext(Pathway = "Complex sugar")
+#get_classlocko_ext(Label = c("chi"))
+#get_classlocko_ext(Label = c("pulA"))
+```
+
+- Key genes of complex sugar is more abundant in water,
+    espcially chi and pulA, which is more abundant in slope and bottom water, respectively.
+    - > 沟底淀粉降解? 是否与沉降速度快有关?
+
+```{r dependson=c("config")}
+tpm_key.signif.sum_mean %>% .[.$Pathway == "D-AA",]
+get_classlocko_ext(Pathway = "D-AA")
+
+tpm_key.signif.sum_mean %>% .[.$Pathway == "L-sugar",]
+get_classlocko_ext(Pathway = "L-sugar")
+```
+
+- 大部分与 D-aa 相关的酶丰度都较高
+- L-糖相关基因的丰度较低, 但主要在沟底丰度较高,
+    除了 galdh, 其主要在坡上的 Planctomycetes 丰度较高
+
+### N
+- [略](check_ko_tpm_MAG_N.Rmd)
+
+### S
+#### sulfate reduction to sulfite
+- 同化型硫酸盐还原为亚硫酸盐在各个环境中差异不大, 而在沟底水样中最丰富
+- 异化型硫酸盐还原为亚硫酸盐主要是在沉积物和坡上的水样中丰度较高
+```{r dependson=c("config")}
+tpm_key.signif.sum_mean %>% .[.$Label %in% c("cysNC", "cysD", "cysC", "cysH"),]
+get_classlocko_ext(Label = c("cysNC", "cysD", "cysC", "cysH"))
+tpm_key.signif.sum_mean %>% .[.$Label %in% c("sat", "aprA"),]
+get_classlocko_ext(Label = c("sat", "aprA"))
+```
+
+#### sulfite reduction to sulfide
+- 同化型亚硫酸盐还原为硫化氢关键基因中,
+    cysJ 主要在沟底水体中具有较高丰度,
+    cysL 在各环境中丰度都比较高
+    sir 在非沟底水体中具有较高丰度,
+- 异化型亚硫酸盐还原为硫化氢关键基因 dsrA 主要在沟底沉积物中
+```{r dependson=c("config")}
+tpm_key.signif.sum_mean %>% .[.$Label %in% c("cysJ", "cysI", "sir", "dsrA"),]
+get_classlocko_ext(Label = c("sat", "aprA"))
+```
+
+#### SOX system
+- 硫代硫酸盐氧化能力在沟底水样中相对较低
+```{r dependson=c("config")}
+tpm_key.signif.sum_mean %>% .[.$Label %in% c("soxA", "soxC", "soxY"),]
+get_classlocko_ext(Label = c("sat", "aprA"))
+```
+
+#### Other genes
+- 硫化氢利用相关的基因 (cysK) 在沟底非常丰富,
+    相关类群包括各种古菌和细菌 (能否暗示活跃的碳固定过程?)
+```{r dependson=c("config")}
+tpm_key.signif.sum_mean %>% .[.$Label %in% c("cysK", "glpE", "phsA", "sqr"),]
+get_classlocko_ext(Label = c("cysK"))
+```
+
+### 重金属和其他环境适应基因
+- arsA (ATPase), B (arsenite permease) and C (arsenate reductase) (10.1007/s10646-011-0779-x)
+- arsC 主要类型为 glutaredoxin 和 thioredoxin, 而 arsenate-mycothiol transferase 类型的基因丰度最低
+- arsA 在沟底较多, arsB, arsM 在其他环境中较多 (可能沟底水体中 As 含量较低, 沉积物中有较多砷?)
+- aoxA 丰度很低
+```{r dependson=c("config")}
+tpm_key.signif.sum_mean %>% .[.$Label %in% c("arsC1", "arsC2", "arsC3"),]
+tpm_key.signif.sum_mean %>% .[.$Label %in% c("arsA", "arsB", "arsM"),]
+tpm_key.signif.sum_mean %>% .[.$Label %in% c("aoxA"),]
+```
+
+- selD (selenide, water dikinase) 在各个环境中都比较丰富
+- selA (L-seryl-tRNA(Ser) seleniumtransferase) 在各个环境中也比较丰富, 但在沟底水样中稍少
+- selU (tRNA 2-selenouridine synthase) 主要在沟底水样比较丰富, 在 Gammaproteobacteria 较多
+```{r dependson=c("config")}
+tpm_key.signif.sum_mean %>% .[.$Pathway == "Se",]
+get_classlocko_ext(Label = "selU")
+```
+
+- 各个参与 ROS 的基因丰度都较高,
+    - katE 和 sod1 在沟底水样中的丰度明显高于其在其他环境中的丰度, 在坡上水样中的丰度最低
+```{r dependson=c("config")}
+tpm_key.signif.sum_mean %>% .[.$Pathway == "ROS",]
+```
+
+```{r dependson=c("config")}
+tpm_key.signif.sum_mean %>% .[.$Pathway == "Glycine betaine",]
+```
+
+- tmm 在坡上水样中最多, 而在沟底水样中最少
+- torZ 主要在水样中
+- 没有 MAG 同时具有这两个基因
+```{r dependson=c("config")}
+tpm_key.signif.sum_mean %>% .[.$Pathway == "TMAO",]
+get_classlocko_ext(Label = "tmm")
+get_classlocko_ext(Label = "torZ")
+```
+
+- DMSP 主要在 Rhodobacteraceae 中发现, 丰度较低,
+    dmnD 主要在水样中, dddL 在沉积物中稍高
+```{r dependson=c("config")}
+tpm_key.signif.sum_mean %>% .[.$Pathway == "DMSP",]
+get_classlocko_ext(Pathway = "DMSP")
+```

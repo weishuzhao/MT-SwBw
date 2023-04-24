@@ -1,0 +1,243 @@
+KO	Label	Pathway	New	Arrow
+K18594	3hpcs	3HP-4HB	False
+K18593	4hbcl	3HP-4HB	False
+K00024	mdh	rTCA	True
+K00174	korA	rTCA	True
+K00175	korB	rTCA	True
+K00176	korD	rTCA	True
+K00177	korC	rTCA	True
+K20140	cfiA	rTCA	True
+K00031	icd	rTCA	True
+K01681	acnA	rTCA	True
+K01682	acnB	rTCA	True
+K15231	aclB	rTCA	True
+K01644	citE	rTCA	True
+K15234	ccl	rTCA	True
+K01675	fumD	rTCA	True
+K01676	E4.2.1.2A	rTCA	True
+K01677	E4.2.1.2AA	rTCA	True
+K01678	E4.2.1.2AB	rTCA	True
+K01679	E4.2.1.2B	rTCA	True
+K01774	fumE	rTCA	True
+K00239	sdhA	rTCA	True
+K00240	sdhB	rTCA	True
+K00244	frdA	rTCA	True
+K00245	frdB	rTCA	True
+K18556	NADH-frdA	rTCA	True
+K18209	tfrA	rTCA	True
+K01900	LSC2	rTCA	True
+K01902	sucD	rTCA	True
+K01903	sucC	rTCA	True
+K14471	smtA1	rTCA	True
+K14472	smtB	rTCA	True
+K18289	ict-P	rTCA	True
+K15230	aclA	rTCA	False
+K15232	ccsA	rTCA	False
+K01601	cbbL	CBB	True
+K01602	cbbS	CBB	True
+K00927	pgk	CBB	True
+K00134	gapA	CBB	True
+K00150	gap2	CBB	True
+K01803	tpiA	CBB	True
+K01623	ALDO	CBB	True
+K01624	fbaA	CBB	True
+K11645	fbaB	CBB	True
+K16305	K16305	CBB	True
+K16306	K16306	CBB	True
+K00615	E2.2.1.1	CBB	True
+K01622	K01622	CBB	True
+K02446	glpX	CBB	True
+K03841	fbp	CBB	True
+K11532	glpX-SEBP	CBB	True
+K01783	rpe	CBB	True
+K01807	rpiA	CBB	True
+K01808	rpiB	CBB	True
+K00855	prkB	CBB	False
+K00496	alkM	Alkane	False
+K20938	ladA	Alkane	False
+K00494	luxA	Alkane	False
+K00457	hppD	Plastic degradation	False
+K00477	PHYH	Plastic degradation	False
+K00404	ccoN	Plastic degradation	False
+K00405	ccoO	Plastic degradation	False
+K00406	ccoP	Plastic degradation	False
+K00407	ccoQ	Plastic degradation	False
+K15862	ccoNO	Plastic degradation	False
+K00278	nadB	Plastic degradation	False
+K00275	pdxH	Plastic degradation	False
+K05558	pdxH family	Plastic degradation	False
+K00425	cydA	Plastic degradation	False
+K02274	coxA	Plastic degradation	False
+K00428	cyt c peroxidase	Plastic degradation	False
+K00432	gpx	Plastic degradation	False
+K04761	oxyR	Plastic degradation	False
+K04117	aliB	Aromatic	True
+K07535	badH	Aromatic	True
+K07536	badI	Aromatic	True
+K15757	xylM	Aromatic	True
+K00141	xylC	Aromatic	True
+K15760	tmoA	Aromatic	True
+K15762	tmoC	Aromatic	True
+K15763	tmoD	Aromatic	True
+K15764	tmoE	Aromatic	True
+K15765	tmoF	Aromatic	True
+K05550	benB-xylY	Aromatic	True
+K05784	benC-xylZ	Aromatic	True
+K05783	benD-xylL	Aromatic	True
+K01856	catB	Aromatic	True
+K03464	catC	Aromatic	True
+K01055	pcaD	Aromatic	True
+K14727	pcaL	Aromatic	True
+K00446	dmpB	Aromatic	True
+K10217	dmpC	Aromatic	True
+K01821	praC	Aromatic	True
+K01617	dmpH	Aromatic	True
+K10216	dmpD	Aromatic	True
+K18364	bphH	Aromatic	True
+K02554	mhpD	Aromatic	True
+K18365	bphI	Aromatic	True
+K01666	mhpE	Aromatic	True
+K18366	bphJ	Aromatic	True
+K04073	mhpF	Aromatic	True
+K16249	dmpK	Aromatic	True
+K16243	dmpL	Aromatic	True
+K16244	dmpM	Aromatic	True
+K16245	dmpO	Aromatic	True
+K16246	dmpP	Aromatic	True
+K04116	aliA	Aromatic	False
+K00055	badh	Aromatic	False
+K05549	benA	Aromatic	False
+K15512	boxB	Aromatic	False
+K16239	bsdC	Aromatic	False
+K03381	catA	Aromatic	False
+K07104	catE	Aromatic	False
+K16242	dmpN	Aromatic	False
+K04108	hcrA	Aromatic	False
+K04101	ligB	Aromatic	False
+K00449	pcaH	Aromatic	False
+K19668	cbhA	Complex sugar	False
+K01183	chi	Complex sugar	False
+K25010	ge	Complex sugar	False
+K00688	glgP	Complex sugar	True
+K16153	K16153	Complex sugar	True
+K00705	malQ	Complex sugar	True
+K22451	jgt	Complex sugar	True
+K02438	glgX	Complex sugar	True
+K15779	PGM2	Complex sugar	True
+K01835	pgm	Complex sugar	True
+K15778	pmm-pgm	Complex sugar	True
+K01200	pulA	Complex sugar	False
+K00068	srlD	Complex sugar	False
+K01775	alr	D-AA	False
+K00285	dadA	D-AA	False
+K00824	dat	D-AA	False
+K01753	dsdA	D-AA	False
+K19967	dta	D-AA	False
+K01776	murl	D-AA	False
+K01777	prdF	D-AA	False
+K01779	racD	D-AA	False
+K25316	racX	D-AA	False
+K01804	araA	L-sugar	False
+K01818	fucl	L-sugar	False
+K01809	manA	L-sugar	True
+K17497	PMM	L-sugar	True
+K00966	GMPP	L-sugar	True
+K10046	GME	L-sugar	True
+K17744	galdh	L-sugar	False
+K03534	rhaM	L-sugar	False
+K02586	nifD	N	True	Nitrogen fixation
+K02591	nifK	N	True	Nitrogen fixation
+K00360	nasB	N	True	Assimilatory Nitrate -> Nitrite
+K00372	nasA	N	False	Assimilatory Nitrate -> Nitrite
+K00367	narB	N	False	Assimilatory Nitrate -> Nitrite
+K00370	narG/nxrA	N	False	Dissimilatory Nitrate <-> Nitrite
+K00371	narH/nxrB	N	True	Dissimilatory Nitrate <-> Nitrite
+K00374	narI	N	True	Dissimilatory Nitrate -> Nitrite
+K02567	napA	N	False	Dissimilatory Nitrate -> Nitrite
+K02568	napB	N	True	Dissimilatory Nitrate -> Nitrite
+K03385	nrfA	N	False	Dissimilatory Nitrite -> Ammonia
+K15876	nrfH	N	True	Dissimilatory Nitrite -> Ammonia
+K00362	nirB	N	True	Dissimilatory Nitrite -> Ammonia
+K00363	nirD	N	True	Dissimilatory Nitrite -> Ammonia
+K00366	nirA	N	False	Assimilatory Nitrite -> Ammonia
+K00368	nirK	N	False	Nitrite -> Nitrogen oxide
+K15864	nirS	N	True	Nitrite -> Nitrogen oxide
+K02305	norC	N	True	Nitrogen oxide -> Nitrous oxide
+K04561	norB	N	False	Nitrogen oxide -> Nitrous oxide
+K15877	CYP55	N	False	Nitrogen oxide -> Nitrous oxide
+K00376	nosZ	N	False	Nitrous oxide -> Nitrogen
+K05601	hcp	N	False	Hydroxylamine -> Ammonia
+K10944	amoA	N	False	Ammonia -> Hydroxylamine
+K10945	amoB	N	True	Ammonia -> Hydroxylamine
+K10946	amoC	N	True	Ammonia -> Hydroxylamine
+K10535	hao	N	True	Hydroxylamine -> Nitrite
+K01948	CPS1	N	True	Ammonia <-> Organic
+K01915	glnA	N	False	Ammonia <-> Organic
+K00605	gcvT	N	False	Ammonia <-> Organic
+K00262	GLUD1_2	N	False	Ammonia <-> Glu
+K00261	gdhA	N	False	Ammonia <-> Glu
+K00260	gudB	N	False	Ammonia <-> Glu
+K15371	GDH1	N	False	Ammonia <-> Glu
+K01501	E3.5.5.1	N	True	Nitrile -> Ammonia
+K01428	ureC	N	False	Urea -> Ammonia
+K00491	nos	N	False	Arg -> Nitrogen oxide
+K00459	ncd	N	True	Nitroalkan -> Nitrite
+K15576	nrtA	N	False	Nitrate transport
+K15577	nrtB	N	False	Nitrate transport
+K15578	nrtC	N	False	Nitrate transport
+K15579	nrtD	N	False	Nitrate transport
+K02575	NRT	N	False	Nitrate/Nitrite transport
+K03320	amt	N	False	Ammonia transport
+K13811	PAPSS	S	True
+K00956	cysN	S	True
+K00395	aprB	S	True
+K11181	dsrB	S	True
+K17223	soxX	S	True
+K17224	soxB	S	True
+K22622	soxD	S	True
+K17227	soxZ	S	True
+K00394	aprA	S	False
+K00860	cycC	S	False
+K00640	cysE	S	True
+K17069	MET17	S	True
+K01738	cysK	S	False
+K00955	cysNC	S	False
+K00957	cysD	S	False
+K00390	cysH	S	False
+K00381	cysI	S	False
+K00380	cysJ	S	False
+K11180	dsrA	S	False
+K02439	glpE	S	False
+K08352	phsA	S	False
+K00958	sat	S	False
+K00392	sir	S	False
+K17222	soxA	S	False
+K17225	soxC	S	False
+K17226	soxY	S	False
+K17218	sqr	S	False
+K08355	aoxA	As	False
+K01551	arsA	As	False
+K03893	arsB	As	False
+K00537	arsC1	As	False
+K03741	arsC2	As	False
+K18701	arsC3	As	False
+K07755	arsM	As	False
+K01042	selA	Se	False
+K01008	selD	Se	False
+K06917	selU	Se	False
+K03781	katE	ROS	False
+K03782	katG	ROS	False
+K04565	sod1	ROS	False
+K04564	sod2	ROS	False
+K00518	sodN	ROS	False
+K17755	codA	Glycine betaine	True
+K00108	betA	Glycine betaine	True
+K11440	gbsB	Glycine betaine	True
+K00499	CMO	Glycine betaine	True
+K00130	gbsA	Glycine betaine	False
+K05845	opuC	Glycine betaine	False
+K18277	tmm	TMAO	False
+K07812	torZ	TMAO	False
+K16953	dddL	DMSP	False
+K17486	dmdA	DMSP	False
+K24666	dsyB	DMSP	False

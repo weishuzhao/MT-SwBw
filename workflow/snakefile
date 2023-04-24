@@ -1,0 +1,73 @@
+"""
+ * @Date: 2022-05-28 23:04:47
+ * @LastEditors: Hwrn hwrn.aou@sjtu.edu.cn
+ * @LastEditTime: 2023-04-24 21:25:40
+ * @FilePath: /2021_09-MT10kSW/workflow/snakefile
+ * @Description:
+"""
+from utils.file_path import SnakeConfigGet, site_layer_dict, file_path
+
+snake_config = SnakeConfigGet(config)
+THREADS = snake_config.THREADS
+SLURM_ARRAY_TASK_ID = snake_config.SLURM_ARRAY_TASK_ID
+
+
+rule all:
+    input:
+        # support figure
+        fig_phylpflash_unannot=file_path.figs("supp.fig1_phylpflash_unannot"),
+        fig_coverm_relabd_signif_N=file_path.figs("supp.fig2_coverm_relabd_signif_N"),
+        fig_mag_venn=file_path.figs("supp.fig3_mag_venn"),
+        fig_ko_tpm_signif_site=file_path.figs("supp.fig4_ko_tpm_signif_site"),
+        fig_ko_class_heatmap_N=file_path.figs("supp.fig5_ko_class_heatmap_N"),
+        fig_ko_relationship_N=[
+            file_path.figs(f"supp.fig6.{i}_ko_relationship_N_{domain_spec}")
+            for i, domain_spec in zip(range(1, 4), ("All", "Archaea", "Bacteria"))
+        ],
+        fig_ko_tpm_MAG_N_bar=file_path.figs("supp.fig7_ko_tpm_MAG_N_bar"),
+        fig_icamp_boot_summary_groups_bar=file_path.figs(
+            "supp.fig8_icamp_boot_summary_groups_bar"
+        ),
+        fig_ko_tpm_MAG_N_pie=file_path.figs("ko_tpm_MAG_N_pie"),
+        fig_icamp_boot_summary_groups_pie=file_path.figs(
+            "icamp_boot_summary_groups_pie"
+        ),
+        fig_coverm_relative_abundance_2d=file_path.figs("coverm_relabd_2d"),
+        fig_coverm_relative_abundance_taxon_class=file_path.figs(
+            "coverm_relabd_bar-color"
+        ),
+        # main figure
+        fig_sample_site_map=file_path.figs("fig1_sample_site_map"),
+        fig_relative_nmds_class=file_path.figs("fig2_relative_nmds_class"),
+        fig_ko_tpm_site_signif_N=file_path.figs("fig4_ko_tpm_site_signif_N"),
+        # support table
+        tab_relative_abundance=file_path.tabs("tabS1_relative_abundance"),
+        tab_ko_tpm_genome_N_kayer_ko=file_path.tabs(
+            "tabS2_tab_ko_tpm_genome_N_kayer_ko"
+        ),
+    shell:
+        "ls -l {input}"
+
+
+rule fig_to_number:
+    input:
+        unnamed_fig=file_path.figs("{any}", suffix=""),
+    output:
+        out_fig=file_path.figs("{fig_type}{number}_{any}", suffix=""),
+    wildcard_constraints:
+        supp="supp\\.fig|fig",
+        number="[\\d.]+",
+    shell:
+        """
+        mv {input.unnamed_fig} {output.out_fig}
+        """
+
+
+include: "remote/remote.smk"
+include: "reads_diversity/reads_diversity.smk"
+include: "gene_annot/gene_annot.smk"
+include: "MAGs/MAGs.smk"
+include: "MAGs_tpm/MAGs_tpm.smk"
+include: "salmon/salmon.smk"
+include: "MAGs/MAGs_tree.smk"
+include: "others/others.smk"

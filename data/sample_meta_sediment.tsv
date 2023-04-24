@@ -1,0 +1,24 @@
+SRR	Layers  for metagenome [cmbsf]	Cruise	Sample station	Sampling method	"Latitude [degree North]"	"Longitude [degree East]"	"Water Depth [m]"	Position in Trench	"Core length [cmbsf]"	Sample Depth [cm]	Layers for metatransciptome  [cmbsf]	bottom-water temperature [oC]
+SRR13077602	R1.0-3cmbsf	TS01	T1L6	push core (lander)	11.091	142.073	7,850	south slope	15	3	---	---
+SRR13077601	R2.0-3cmbsf	TS01	T1L6	push core (lander)	11.091	142.073	7,850	south slope	15	3	---	---
+SRR12883924	0-2cmbsf	TS01	T1B10	box core (hydrographic cable)	11.195	141.812	8,638	south slope	66	2	---	2.03
+SRR12883923	36-38cmbsf	TS01	T1B10	box core (hydrographic cable)	11.195	141.812	8,638	south slope	66	2	---	2.03
+SRR12883922	44-46cmbsf	TS01	T1B10	box core (hydrographic cable)	11.195	141.812	8,638	south slope	66	2	---	2.03
+SRR12822926	0-3cmbsf	TS01	T1B11	box core (hydrographic cable)	11.228	141.689	9,150	north slope	3*	---	---	---
+SRR12887798	0-3cmbsf	TS03	T3L11	push core (lander)	11.325	142.191	10,908	bottom-axis	21	3	6-9; 12-15; 18-21	2.46
+SRR12887797	6-9cmbsf	TS03	T3L11	push core (lander)	11.325	142.191	10,908	bottom-axis	21	3	6-9; 12-15; 18-21	2.46
+SRR12887796	12-15cmbsf	TS03	T3L11	push core (lander)	11.325	142.191	10,908	bottom-axis	21	3	6-9; 12-15; 18-21	2.46
+SRR12887795	18-21cmbsf	TS03	T3L11	push core (lander)	11.325	142.191	10,908	bottom-axis	21	3	6-9; 12-15; 18-21	2.46
+SRR12888151	0-3cmbsf	TS03	T3L8	push core (lander)	11.327	142.194	10,909	bottom-axis	24	3	---	2.32
+SRR12888150	6-9cmbsf	TS03	T3L8	push core (lander)	11.327	142.194	10,909	bottom-axis	24	3	---	2.32
+SRR12888149	12-15cmbsf	TS03	T3L8	push core (lander)	11.327	142.194	10,909	bottom-axis	24	3	---	2.32
+SRR12888148	18-21cmbsf	TS03	T3L8	push core (lander)	11.327	142.194	10,909	bottom-axis	24	3	---	2.32
+SRR12887238	0-2cmbsf	TS03	T3L14	push core (lander)	11.325	142.189	10,911	bottom-axis	22	2	---	2.46
+SRR12887237	4-6cmbsf	TS03	T3L14	push core (lander)	11.325	142.189	10,911	bottom-axis	22	2	---	2.46
+SRR12887236	6-8cmbsf	TS03	T3L14	push core (lander)	11.325	142.189	10,911	bottom-axis	22	2	---	2.46
+SRR12887235	12-14cmbsf	TS03	T3L14	push core (lander)	11.325	142.189	10,911	bottom-axis	22	2	---	2.46
+SRR12887234	18-20cmbsf	TS03	T3L14	push core (lander)	11.325	142.189	10,911	bottom-axis	22	2	---	2.46
+SRR12886645	0-3cmbsf	TS01	T1L10	push core (lander)	11.328	142.202	10,900	bottom-axis	21	3	---	---
+SRR12886644	6-9cmbsf	TS01	T1L10	push core (lander)	11.328	142.202	10,900	bottom-axis	21	3	---	---
+SRR12886643	12-15cmbsf	TS01	T1L10	push core (lander)	11.328	142.202	10,900	bottom-axis	21	3	---	---
+SRR12886642	18-21cmbsf	TS01	T1L10	push core (lander)	11.328	142.202	10,900	bottom-axis	21	3	---	---

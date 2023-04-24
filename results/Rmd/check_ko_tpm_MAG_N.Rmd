@@ -1,0 +1,1164 @@
+<!--
+ * @Date: 2022-07-31 20:51:00
+ * @LastEditors: Hwrn
+ * @LastEditTime: 2022-09-26 10:40:18
+ * @FilePath: /2021_09-MT10kSW/results/Rmd/check_ko_tpm_MAG_N.Rmd
+ * @Description: Genomes grouped by prevalence
+-->
+Results, N
+===
+
+## Data Import and prepare
+
+```{r setup, include=FALSE}
+knitr::opts_knit$set(root.dir = "~/Work/2021_09-MT10kSW/")
+options(width = 120)
+```
+```{r config, message=FALSE, warning=FALSE}
+source("workflow/utils/RLib.local/R/init.r", chdir = TRUE)
+```
+
+```{r load_data, cache=TRUE, dependson=c("config")}
+Wtdb_abd =
+  stringr::str_glue("Wtdb.relative_abundance.tsv") %>%
+  file_path$file_path$results() %>%
+  as.character()
+
+Stdb <- load__Stdb()
+Wtdb <- load__Wtdb()
+genome_taxonomy <- load__genome_taxonomy(load__Stdb(), load__Wtdb())
+genome.relative_abundance <- get_relative_abundance(Wtdb_abd, genome_taxonomy)
+
+taxon_color <- load__taxon_color()
+
+TOTAL_TAXA_NUM <-
+  genome.relative_abundance %>%
+  {
+    sapply(taxon.split(.$Taxonomy, 1, 7), get_taxon_color)
+  } %>%
+  unique() %>%
+  length() %>%
+  {
+    . * 2
+  }
+
+key_genes <- load__key_genes()
+key_genes_N <-
+  key_genes %>%
+  .[.$Pathway == "N", ] %>%
+  {
+    .$Pathway <- .$Arrow %>% factor(levels = unique(.))
+    .
+  }
+TOTAL_GENE_NUM <- key_genes$KO %>%
+  length() %>%
+  {
+    . * 2
+  }
+
+gene_ko_tpm_N <-
+  load__gene_ko_tpm() %>%
+  .[.$KO %in% key_genes_N$KO, ]
+genomeko_N <-
+  load__genomeko() %>%
+  .[rownames(.) %>% .[. %in% key_genes_N$KO], ] %>%
+  .[apply(., 1, sum) > 0, apply(., 2, sum) > 0]
+```
+
+```{r classlocko_pct, cache=TRUE, dependson=c("load_data")}
+annotation_genomes <-
+  get_taxon_group(genome.relative_abundance, "Genome", "Group") %>%
+  {
+    rownames(.) <- .$Genome %>% gsub("^(.+)$", "\\1.fa", .)
+    .$Genome <- NULL
+    .
+  }
+
+key_genes_N.genome <-
+  genomeko_N %>%
+  reshape2::melt(varnames = c("KO", "Genome")) %>%
+  .[.$value > 0, ] %>%
+  merge(key_genes_N) %>%
+  merge(
+    genome_taxonomy[c("Genome", "Taxonomy")] %>%
+      {
+        .$Taxonomy <- taxon.split(.$Taxonomy, 1, 7)
+        .
+      } %>%
+      {
+        .$Taxa_label <- sapply(.$Taxonomy, get_taxon_color)
+        .
+      } %>%
+      {
+        .$Phylum <- taxon.split(.$Taxa_label, 1, 2)
+        .
+      }
+  ) %>%
+  .[c(names(key_genes_N), "Genome", "Taxonomy", "Taxa_label", "Phylum")]
+df_x <- key_genes_N.genome %>%
+  .[c("Phylum", "Taxa_label")] %>%
+  unique()
+df_fill <- sample_meta[c("Location", "Group")] %>% unique()
+
+report__genome.abundance_label <- function(label) {
+  key_genes_N.genome.one_label <-
+    key_genes_N.genome %>%
+    .[.$Label == label, ]
+  key_genes_N.genome.one_label %>%
+    merge(genome.relative_abundance[c("Genome", "Layer", "Relative_abundance")]) %>%
+    group_by(Taxa_label, Layer) %>%
+    summarise(Relative_abundance = sum(Relative_abundance)) %>%
+    {
+      .$Site <- .$Layer %>% gsub("^(.+)\\.\\.(.+)$", "\\1", .)
+      .
+    } %>%
+    merge(merge(site_group, df_fill)) %>%
+    report__abundance_bar_group(
+      TOTAL_TAXA_NUM, df_x, df_fill,
+      x = "Taxa_label", y = "Relative_abundance", fill = "Group",
+      grid_formula = formula("Location ~ Phylum"),
+      p.value.char.filter = . %>% .[!grepl("[?]", .$p.value.char), ]
+    ) %>%
+    {
+      . +
+        labs(y = label) +
+        theme(axis.text.x = element_text(size = 0))
+    }
+}
+# report__genome.abundance_label("hcp")
+```
+
+```{r genome_group, dependson=c("config", "load_data"), warning=FALSE}
+genome.existance <-
+  genome.relative_abundance %>%
+  {
+    data.frame(
+      "Genome" = .$Genome,
+      "Class" = .$Taxonomy %>% taxon.split(1, 3),
+      "Taxonomy" = .$Taxonomy %>% taxon.split(1, 7),
+      "Layer" = .$Layer, "Group" = .$Group,
+      "Exist" = TRUE
+    )
+  }
+genome.existance_group <-
+  genome.existance %>%
+  .[c("Genome", "Class", "Group", "Taxonomy")] %>%
+  split(.$Genome) %>%
+  lapply(. %>%
+    {
+      .$Group <- .$Group %>%
+        unique() %>%
+        sort() %>%
+        paste(collapse = ",")
+      .
+    } %>%
+    head(1)) %>%
+  bind_rows()
+
+key_gene_genome_layer <-
+  gene_ko_tpm_N %>%
+  {
+    .$Genome <- .$Genome %>% gsub(".fa$", "", .)
+    .
+  } %>%
+  merge(genome_taxonomy[c("Cluster", "Genome")]) %>%
+  {
+    .$Genome <- NULL
+    .
+  } %>%
+  merge(genome_taxonomy[c("Cluster", "Genome", "Rep")] %>% .[.$Rep, ]) %>%
+  group_by(KO, Layer, Genome) %>%
+  summarise(TPM = sum(TPM)) %>%
+  merge(genome.existance[c("Layer", "Group")] %>% unique()) %>%
+  merge(genome.existance[c("Genome", "Layer", "Exist")], all.x = TRUE) %>%
+  {
+    .$TPM.adj <- .$TPM * (1 - 2 * is.na(.$Exist))
+    .
+  }
+
+df <-
+  key_gene_genome_layer %>%
+  {
+    .$Sum <- 0
+    .
+  } %>%
+  merge(key_genes_N) %>%
+  reshape2::dcast(formula("Genome + Group + Layer + Sum ~ Label"),
+    value.var = "TPM.adj"
+  ) %>%
+  {
+    .$Sum <- apply(.[-(1:4)], 1, . %>% .[!is.na(.)] %>% abs() %>% sum())
+    .
+  } %>%
+  split(.$Group) %>%
+  # lapply(function(df) {df[order(df$Layer, df$Taxonomy, df$Sum),]}) %>%
+  bind_rows()
+
+genome_group <- function(label, fun.aggregate = length) {
+  # key_genes[key_genes$KO %in% ko, ] %>% as.matrix %>% message.print()
+  {
+    !is.na(df[label])
+  } %>%
+    apply(1, all) %>%
+    df[., c("Genome", "Group", "Layer", label)] %>%
+    reshape2::dcast(
+      formula("Genome ~ Group"),
+      fun.aggregate = fun.aggregate, value.var = label
+    ) %>%
+    merge(genome.existance_group) %>%
+    data.frame() %>%
+    {
+      .$Genome <- NULL
+      .
+    }
+}
+```
+
+## Nitrogen fixation
+- 文献参考
+    - 上一篇分析本文使用的沉积物的文章没有发现氮固定基因, (zhou_2022),
+    - 但其他多篇文献报道了深渊碳固定, 如在雅普海沟中 (zhang_2018).
+
+- nifH have not been detected in any represantative MAGs,
+    but in a MAG annotated as Alteriqipengyuania of Sphingomonadales, Alphaproteobacteria.
+    - 文献报道, 该类群具有固碳能力.
+
+        > Among the observed genera of both consortia, Methanobacterium, Clostridium, Desulfosporosinus, Ethanoligenens, Pelosinus, Sporolactobacillus, Methylobacterium, Mesorhizobium, Phyllobacterium, Sphingomonas, Pelomonas and Ralstonia belong to cluster I, cluster II, and cluster III of the N-fixing phylogeny and are known to synthesise nitrogenase, including alternative nitrogenases, for fixing atmospheric N235,36,37,38,39,40,41,42,43,44,45,46,47,48.
+        > - Dey, S., Awata, T., Mitsushita, J. et al. Promotion of biological nitrogen fixation activity of an anaerobic consortium using humin as an extracellular electron mediator. Sci Rep 11, 6567 (2021). https://doi.org/10.1038/s41598-021-85955-3
+
+### nifDK
+```{r}
+labels <- c("nifD", "nifK") %>%
+  {
+    names(.) <- .
+    .
+  }
+
+labels %>%
+  lapply(
+    . %>% genome_group(. %>% abs() %>% median())
+  ) %>%
+  bind_rows(.id = "Label")
+
+labels %>%
+  lapply(function(label) {
+    key_genes_N %>% .[.$Label == label, "KO"]
+  }) %>%
+  unlist() %>%
+  as.character() %>%
+  {
+    genomeko_N[., ]
+  } %>%
+  t() %>%
+  {
+    data.frame(.)[apply(., 1, sum) > 0, ]
+  } %>%
+  merge(genome.relative_abundance, by.x = 0, by.y = "Genome") %>%
+  .[-1]
+```
+- nifDK were found in a manual curated MAG assembled from the slope water samples,
+    which is annotated as Bradyrhizobiom.
+    However, the relative abundance of nirKD is highest in the bottom sediment,
+    and unexpectedly undetected in slope sediment samples.
+- 已有实验证明, 该类群在大洋深部 (~1000 米) 具有比浅层更高的 nifH 转录活性 [benavides_2022](https://doi.org/10.1038/s41396-022-01289-6).
+    This indicates that
+        Bradyrhizobiom may be an important nitrogen fixer in the dark ocean,
+        sinking and finally be buried in the bottom.
+
+- 综上, 深渊中氮固定主要在沟底发生.
+
+## Ammonia Oxidation (Nitrification)
+### amoABC | Ammonia -> Hydroxylamine
+```{r}
+labels <- c("amoA", "amoB", "amoC") %>%
+  {
+    names(.) <- .
+    .
+  }
+
+labels %>%
+  lapply(
+    . %>%
+      genome_group(. %>% abs() %>% median()) %>%
+      {
+        split(.[1:4], as.character(.[, 5]))
+      } %>%
+      lapply(. %>%
+        {
+          .[is.na(.)] <- 0
+          .
+        }) %>%
+      lapply(. %>% apply(., 2, sum)) %>%
+      bind_rows(.id = "Class")
+  ) %>%
+  bind_rows(.id = "Label")
+
+key_genes_N %>%
+  .[.$Label %in% labels, "KO"] %>%
+  as.character() %>%
+  {
+    genomeko_N[., ]
+  } %>%
+  .[apply(., 1, sum) > 0, apply(. > 0, 2, sum) > 1] %>%
+  t() %>%
+  merge(
+    Stdb %>%
+      {
+        rownames(.) <- gsub("\\.fa$", "", .$Genome)
+        .
+      } %>%
+      .[c(
+        "Secondary_cluster", "Completeness", "Contamination",
+        "Seqnumbers", "Maxlength", "Genomesize", "Gc", "N50", "L50",
+        "Totalavgdepth"
+      )],
+    by = 0
+  ) %>%
+  {
+    .$Row.names <- NULL
+    .
+  } %>%
+  merge(
+    Wtdb[c("Cluster", "Classification")],
+    by.x = "Secondary_cluster", by.y = "Cluster"
+  ) %>%
+  {
+    .$Taxonomy <- .$Classification %>% taxon.split(1, 7)
+    .$Classification <- NULL
+    .
+  } %>%
+  .[taxon.split(.$Taxonomy, 1) == "Bacteria", ]
+
+genome_group(
+  "amoB", . %>% abs() %>% median()
+) %>%
+  .[grepl("^Bacteria", .$Class), ] %>%
+  merge(Wtdb %>%
+    {
+      .$Taxonomy <- taxon.split(.$Taxonomy, 1, 7)
+      .
+    }, by = "Taxonomy") %>%
+  merge(Stdb, by = "Genome")
+
+labels %>%
+  lapply(
+    . %>%
+      genome_group(median(abs(.))) %>%
+      {
+        .[is.na(.)] <- 0
+        .
+      } %>%
+      {
+        lapply(
+          colnames(.[1:(length(.) - 3)]), function(g) .[which.max(.[, g]), ]
+        )
+      } %>%
+      bind_rows() %>%
+      unique()
+  ) %>%
+  bind_rows(.id = "Label") %>%
+  .[order(.$Taxonomy), ]
+```
+```{r fig.height=10, fig.width=8, message=FALSE, warning=FALSE}
+labels %>%
+  lapply(report__genome.abundance_label) %>%
+  {
+    .$amoA / .$amoB / .$amoC +
+      theme(axis.text.x = element_text(size = 7)) +
+      plot_layout(guides = "collect")
+  }
+```
+
+- amoABC 在各个环境中都有发现, 在沟底沉积物和坡上水样中非常丰富.
+    - amo 基因主要来源于古菌 Nitrososphaeria
+        - Interestingly, a MAG annotated as 'Nitrosopumilus sp013390905' have been found in all environments,
+            and being the most abundant ammonia oxidizer in bottem sediments, bottom water and slope water.
+            However, a MAG annotated to genus 'DRGT01' are the dominant ammonia oxidizer in slope sediment.
+    - Nitrosopumilus sp013390905 is also the main ammonia oxidizer in bottom water,
+        while the relative abundance of amo genes are pretty low compared to other environments.
+    - A few Gammaproteobacteria genomes found in bottom and slope water also encode amo genes,
+        including Immundisolibacter, Polycyclovorans, Ga0077536 and Nitrosomonadaceae.
+    - However, probably related to low MAG quality,
+        the Nitrosomonadaceae amo operon was only found in the replicated MAG.
+
+### hao | Hydroxylamine -> Nitrite
+```{r}
+labels <- c("hao") %>%
+  {
+    names(.) <- .
+    .
+  }
+
+labels %>%
+  lapply(
+    . %>% genome_group(. %>% abs() %>% median())
+  ) %>%
+  lapply(
+    . %>% .[1:(length(.) - 3)]
+  ) %>%
+  lapply(
+    . %>% apply(2, . %>% .[!is.na(.)] %>% sum())
+  ) %>%
+  bind_rows(.id = "Label")
+
+genome_group(
+  labels, . %>% abs() %>% median()
+) %>%
+  {
+    select_rows <-
+      .[1:(length(.) - 3)] %>%
+      lapply(
+        ., . %>% order(decreasing = TRUE) %>% head(5)
+      ) %>%
+      unlist() %>%
+      unique()
+    .[select_rows, ]
+  }
+```
+```{r fig.height=4, fig.width=8, message=FALSE, warning=FALSE}
+labels %>%
+  lapply(report__genome.abundance_label) %>%
+  {
+    .$hao + theme(axis.text.x = element_text(size = 7))
+  }
+```
+- The relative abundance of bacterial hao is relative high in the sediment, and
+    can be found in various genomes,
+    mainly Gemmatimonadetes 和 Marinisomatales.
+
+- 另一种羟胺氧化酶 hox 在本研究中没有发现.
+
+
+## Nitrate -> Nitrite
+### nasAB, narB | Assimilatory
+```{r}
+labels <- c("nasA", "nasB", "narB") %>%
+  {
+    names(.) <- .
+    .
+  }
+
+labels %>%
+  lapply(
+    . %>% genome_group(. %>% abs() %>% median())
+  ) %>%
+  lapply(
+    . %>% .[1:(length(.) - 3)]
+  ) %>%
+  lapply(
+    . %>% apply(2, . %>% .[!is.na(.)] %>% sum())
+  ) %>%
+  bind_rows(.id = "Label")
+
+genome_group(
+  "nasA", . %>% abs() %>% median()
+) %>%
+  {
+    select_rows <-
+      .[1:(length(.) - 3)] %>%
+      lapply(
+        ., . %>% order(decreasing = TRUE) %>% head(2)
+      ) %>%
+      unlist() %>%
+      unique()
+    .[select_rows, ]
+  }
+```
+```{r fig.height=10, fig.width=8, message=FALSE, warning=FALSE}
+labels %>%
+  lapply(report__genome.abundance_label) %>%
+  {
+    .$nasA / .$nasB / .$narB +
+      theme(axis.text.x = element_text(size = 7)) +
+      plot_layout(guides = "collect")
+  }
+```
+
+- The highest relative abundance of nasA and nasB are found in bottom water samples.
+    nasB is only found in some Actinobacteriota MAGs,
+    while nasA is widespread in various bacteria.
+    - 仅发现催化亚基 nasA 说明同化型硝酸盐还原可能存在其他的电子供体, 可能与深渊高压有关.
+- The most abundant nasA genes are annotated from Alteromonas and Halomonas MAGs in the bottom water.
+- narB genes are fund in different classes in water or sediments.
+    - In sediments, narB are annotated from Dehalococcoidia, Gemmatimonadota, and Planctomycetota,
+        while narB only annotated from Bacteroidia, Alphaproteobacteria and few Planctomycetota MAGs.
+    - Meanwhile, though low relative abundance of related MAGs,
+        the abundance of narB is relative high in sediment samples,
+        suggesting an unrecognized organism encoding narB.
+- The relative abundance of either nasAB or narB in slope water is much lower those in sediment,
+    suggesting that assimilatory nitrate reduction is minimized in slope water.
+
+### napAB | Dissimilatory
+```{r}
+labels <- c("napA", "napB") %>%
+  {
+    names(.) <- .
+    .
+  }
+
+labels %>%
+  lapply(. %>% genome_group(. %>% abs() %>% median())) %>%
+  lapply(. %>% .[1:(length(.) - 3)]) %>%
+  lapply(. %>% apply(2, . %>% .[!is.na(.)] %>% sum())) %>%
+  bind_rows(.id = "Label")
+
+labels %>%
+  lapply(
+    . %>%
+      genome_group(. %>% abs() %>% median()) %>%
+      {
+        split(.[1:4], as.character(.[, 5]))
+      } %>%
+      lapply(. %>%
+        {
+          .[is.na(.)] <- 0
+          .
+        }) %>%
+      lapply(. %>% apply(., 2, sum)) %>%
+      bind_rows(.id = "Class")
+  ) %>%
+  bind_rows(.id = "Label") %>%
+  .[order(.$Class), ]
+```
+```{r fig.height=7, fig.width=8, message=FALSE, warning=FALSE}
+labels %>%
+  lapply(report__genome.abundance_label) %>%
+  {
+    .$napA / .$napB + theme(axis.text.x = element_text(size = 7)) + plot_layout(guides = "collect")
+  }
+```
+
+- napAB are more abundant in sediment compared to water,
+    and most napAB genes are annotated from Marinisomatota and Gammaproteobacteria.
+    (However, the difference between slope water and sediment is not significant.)
+- High abundant napA have been annotated from Alphaproteobacteria.
+    However, the abundant of Alphaproteobacteria napB is much lower.
+
+### narGHI/nxrAB | Dissimilatory
+```{r}
+labels <- c("narG/nxrA", "narH/nxrB", "narI") %>%
+  {
+    names(.) <- .
+    .
+  }
+
+labels %>%
+  lapply(. %>% genome_group(. %>% abs() %>% median())) %>%
+  lapply(. %>% .[1:(length(.) - 3)]) %>%
+  lapply(. %>% apply(2, . %>% .[!is.na(.)] %>% sum())) %>%
+  bind_rows(.id = "Label")
+
+labels %>%
+  lapply(
+    . %>%
+      genome_group(. %>% abs() %>% median()) %>%
+      {
+        split(.[1:4], as.character(.[, 5]))
+      } %>%
+      lapply(. %>%
+        {
+          .[is.na(.)] <- 0
+          .
+        }) %>%
+      lapply(. %>% apply(., 2, sum)) %>%
+      bind_rows(.id = "Class")
+  ) %>%
+  bind_rows(.id = "Label") %>%
+  .[order(.$Class), ] %>%
+  as.data.frame()
+```
+```{r fig.height=10, fig.width=8, message=FALSE, warning=FALSE}
+labels %>%
+  lapply(report__genome.abundance_label) %>%
+  {
+    .$`narG/nxrA` / .$`narH/nxrB` / .$narI + theme(axis.text.x = element_text(size = 7)) + plot_layout(guides = "collect")
+  }
+```
+
+- narGHI are also abundant in sediment samples.
+    the relative abundance of narI in bottom water is higher than that in sediment.
+    Bacteria encoding abundant nar genes including
+        Dehalococcoidia, Gemmatimonadetes, Phycisphaerae, Alphaproteobacteria, and Alphaproteobacteria,
+    However, no narI have been detected in Dehalococcoidia.
+- As nxrA and nxrB catalyzing nitrite to nitrate is homologus to narG and narB, respectively, and we use blast to align these sequences against uniport database.
+    11 sequences have been detected in Nitrospiria, Patescibacteria, Planctomycetota and Gammaproteobacteria.
+- To summarise, nitrate reduction (and nitrite oxidation) is less popular in slope water.
+
+## Nitrite -> Ammonia
+### nirA | Assimilatory
+```{r}
+labels <- c("nirA") %>%
+  {
+    names(.) <- .
+    .
+  }
+
+labels %>%
+  lapply(. %>% genome_group(. %>% abs() %>% median())) %>%
+  lapply(. %>% .[1:(length(.) - 3)]) %>%
+  lapply(. %>% apply(2, . %>% .[!is.na(.)] %>% sum())) %>%
+  bind_rows(.id = "Label")
+
+labels %>%
+  lapply(
+    . %>%
+      genome_group(. %>% abs() %>% median()) %>%
+      {
+        split(.[1:4], as.character(.[, 5]))
+      } %>%
+      lapply(. %>%
+        {
+          .[is.na(.)] <- 0
+          .
+        }) %>%
+      lapply(. %>% apply(., 2, sum)) %>%
+      bind_rows(.id = "Class")
+  ) %>%
+  bind_rows(.id = "Label") %>%
+  .[order(.$Class), ]
+```
+```{r fig.height=4, fig.width=8, message=FALSE, warning=FALSE}
+labels %>%
+  lapply(report__genome.abundance_label) %>%
+  {
+    .$nirA + theme(axis.text.x = element_text(size = 7)) + plot_layout(guides = "collect")
+  }
+```
+
+- nirA has been found in various class from both archaea and bacteria MAGs.
+    The relative abundance of nirA is relative high in bottom sediment and slope environments.
+- Most nirA genes are found in Dehalococcoidia and Gemmatimonadetes,
+    while Nitrospinia and Phycisphaerae may also contribute to assimilatory nitrite reduction
+    in slope water and sediments, respectively.
+
+### nrfAH | Dissimilatory
+```{r}
+labels <- c("nrfA", "nrfH") %>%
+  {
+    names(.) <- .
+    .
+  }
+
+labels %>%
+  lapply(. %>% genome_group(. %>% abs() %>% median())) %>%
+  lapply(. %>% .[1:(length(.) - 3)]) %>%
+  lapply(. %>% apply(2, . %>% .[!is.na(.)] %>% sum())) %>%
+  bind_rows(.id = "Label")
+
+labels %>%
+  lapply(
+    . %>%
+      genome_group(. %>% abs() %>% median()) %>%
+      {
+        split(.[1:4], as.character(.[, 5]))
+      } %>%
+      lapply(. %>%
+        {
+          .[is.na(.)] <- 0
+          .
+        }) %>%
+      lapply(. %>% apply(., 2, sum)) %>%
+      bind_rows(.id = "Class")
+  ) %>%
+  bind_rows(.id = "Label") %>%
+  .[.[3:length(.)] %>%
+    apply(1, max) %>%
+    order() %>%
+    rev(), ] %>%
+  as.data.frame()
+```
+```{r fig.height=7, fig.width=8, message=FALSE, warning=FALSE}
+labels %>%
+  lapply(report__genome.abundance_label) %>%
+  {
+    .$nrfA / .$nrfH + theme(axis.text.x = element_text(size = 7)) + plot_layout(guides = "collect")
+  }
+```
+
+- The relative abundance of nrfAH is higher in sediment and slope water.
+- The most abundant nrfA is annotated from Marinisomatia and Ignavibacteria from Bacteroidota
+    in slope water and slope sediment, respectively.
+    And nrfA annotated from SORT01 from Marinisomatota and Ignavibacteria are most abundant in bottom sediment.
+
+### nirBD | Dissimilatory
+```{r}
+labels <- c("nirB", "nirD") %>%
+  {
+    names(.) <- .
+    .
+  }
+
+labels %>%
+  lapply(. %>% genome_group(. %>% abs() %>% median())) %>%
+  lapply(. %>% .[1:(length(.) - 3)]) %>%
+  lapply(. %>% apply(2, . %>% .[!is.na(.)] %>% sum())) %>%
+  bind_rows(.id = "Label")
+
+labels %>%
+  lapply(
+    . %>%
+      genome_group(. %>% abs() %>% median()) %>%
+      {
+        split(.[1:4], as.character(.[, 5]))
+      } %>%
+      lapply(. %>%
+        {
+          .[is.na(.)] <- 0
+          .
+        }) %>%
+      lapply(. %>% apply(., 2, sum)) %>%
+      bind_rows(.id = "Class")
+  ) %>%
+  bind_rows(.id = "Label") %>%
+  .[.[3:length(.)] %>%
+    apply(1, max) %>%
+    order() %>%
+    rev(), ] %>%
+  as.data.frame()
+```
+```{r fig.height=7, fig.width=8, message=FALSE, warning=FALSE}
+labels %>%
+  lapply(report__genome.abundance_label) %>%
+  {
+    .$nirB / .$nirD + theme(axis.text.x = element_text(size = 7)) + plot_layout(guides = "collect")
+  }
+```
+
+- Comparatively, nirBD can be found widespread in our MAGs,
+    and obtained high abundance in all environment especially bottom water.
+    Most nirBD annotated from bottom water are related to Gammaprotebacteria,
+    while nirD from Marinisomatia, Dehalococcoidia, Alphaproteobacteriam, and Nitrospinia
+      are dominant in sediment and slope water.
+
+
+## Denitrification
+### nirKS
+```{r}
+labels <- c("nirK", "nirS") %>%
+  {
+    names(.) <- .
+    .
+  }
+
+labels %>%
+  lapply(. %>% genome_group(. %>% abs() %>% median())) %>%
+  lapply(. %>% .[1:(length(.) - 3)]) %>%
+  lapply(. %>% apply(2, . %>% .[!is.na(.)] %>% sum())) %>%
+  bind_rows(.id = "Label")
+
+labels %>%
+  lapply(
+    . %>%
+      genome_group(. %>% abs() %>% median()) %>%
+      {
+        split(.[1:4], as.character(.[, 5]))
+      } %>%
+      lapply(. %>%
+        {
+          .[is.na(.)] <- 0
+          .
+        }) %>%
+      lapply(. %>% apply(., 2, sum)) %>%
+      bind_rows(.id = "Class") %>%
+      .[.[2:length(.)] %>%
+        apply(1, max) %>%
+        order() %>%
+        rev(), ] %>%
+      head(10)
+  )
+```
+```{r fig.height=7, fig.width=8, message=FALSE, warning=FALSE}
+labels %>%
+  lapply(report__genome.abundance_label) %>%
+  {
+    .$nirK / .$nirS + theme(axis.text.x = element_text(size = 7)) + plot_layout(guides = "collect")
+  }
+```
+
+- nirK have been found in various classes and also be general in these classes.
+    However, the abundance of nirK is relatively low in bottom water samples,
+    while Nitrososphaeria contains the most abundant nirK except in bottom water,
+    followed by Gemmatimonadetes, Alphaproteobacteria, Dehalococcoidia, and Gammaproteobacteria.
+- However, the abundance of nirS is much lower than nirK, and more abundant in sediments.
+    Most nirK in bottom sediment are annotated from Brocadiae from Planctomycetota and Dehalococcoidia,
+    while more nirK are annotated from Marinisomatia in slope sediments.
+
+### CYP55, norBC
+```{r}
+labels <- c("CYP55", "norB", "norC") %>%
+  {
+    names(.) <- .
+    .
+  }
+
+labels %>%
+  lapply(. %>% genome_group(. %>% abs() %>% median())) %>%
+  lapply(. %>% .[1:(length(.) - 3)]) %>%
+  lapply(. %>% apply(2, . %>% .[!is.na(.)] %>% sum())) %>%
+  bind_rows(.id = "Label")
+
+labels %>%
+  lapply(
+    . %>%
+      genome_group(. %>% abs() %>% median()) %>%
+      {
+        split(.[1:4], as.character(.[, 5]))
+      } %>%
+      lapply(. %>%
+        {
+          .[is.na(.)] <- 0
+          .
+        }) %>%
+      lapply(. %>% apply(., 2, sum)) %>%
+      bind_rows(.id = "Class")
+  ) %>%
+  bind_rows(.id = "Label") %>%
+  .[.[3:length(.)] %>%
+    apply(1, max) %>%
+    order() %>%
+    rev(), ] %>%
+  head(20)
+```
+```{r fig.height=10, fig.width=8, message=FALSE, warning=FALSE}
+labels %>%
+  lapply(report__genome.abundance_label) %>%
+  {
+    .$CYP55 / .$norB / .$norC + theme(axis.text.x = element_text(size = 7)) + plot_layout(guides = "collect")
+  }
+```
+
+- The relative abundance of CPY55 is relatively low in all samples.
+- norBC are more abundant in sediment compared to water samples.
+    Gammaproteobacteria encodes abundant norBC in all samples,
+    while Gemmatimonadetes norBC are rich in sediment and
+    Planctomycetota norC is rich in slope water.
+
+### nosZ
+```{r}
+labels <- c("nosZ") %>%
+  {
+    names(.) <- .
+    .
+  }
+
+labels %>%
+  lapply(. %>% genome_group(. %>% abs() %>% median())) %>%
+  lapply(. %>% .[1:(length(.) - 3)]) %>%
+  lapply(. %>% apply(2, . %>% .[!is.na(.)] %>% sum())) %>%
+  bind_rows(.id = "Label")
+
+labels %>%
+  lapply(
+    . %>%
+      genome_group(. %>% abs() %>% median()) %>%
+      {
+        split(.[1:4], as.character(.[, 5]))
+      } %>%
+      lapply(. %>%
+        {
+          .[is.na(.)] <- 0
+          .
+        }) %>%
+      lapply(. %>% apply(., 2, sum)) %>%
+      bind_rows(.id = "Class")
+  ) %>%
+  bind_rows(.id = "Label") %>%
+  .[.[3:length(.)] %>%
+    apply(1, max) %>%
+    order() %>%
+    rev(), ]
+```
+```{r fig.height=4, fig.width=8, message=FALSE, warning=FALSE}
+labels %>%
+  lapply(report__genome.abundance_label) %>%
+  {
+    .$nosZ + theme(axis.text.x = element_text(size = 7)) + plot_layout(guides = "collect")
+  }
+```
+
+- All MAGs encoding norZ have been found in bottom,
+    and much more abundant in bottom sediment.
+
+
+## Ammonia uptake / product
+### gdhA, gudB, GDH1, GLUD1_2
+```{r}
+labels <- c("gdhA", "gudB", "GDH1", "GLUD1_2") %>%
+  {
+    names(.) <- .
+    .
+  }
+
+labels %>%
+  lapply(. %>% genome_group(. %>% abs() %>% median())) %>%
+  lapply(. %>% .[1:(length(.) - 3)]) %>%
+  lapply(. %>% apply(2, . %>% .[!is.na(.)] %>% sum())) %>%
+  bind_rows(.id = "Label")
+```
+```{r fig.height=13, fig.width=8, message=FALSE, warning=FALSE}
+labels %>%
+  lapply(report__genome.abundance_label) %>%
+  {
+    .$gdhA / .$gudB / .$GDH1 / .$GLUD1_2 + theme(axis.text.x = element_text(size = 7)) + plot_layout(guides = "collect")
+  }
+```
+
+
+### CPS1, glnA, gcvT
+```{r}
+labels <- c("CPS1", "glnA", "gcvT") %>%
+  {
+    names(.) <- .
+    .
+  }
+
+genome_group("CPS1", . %>% abs() %>% median())
+
+labels %>%
+  lapply(. %>% genome_group(. %>% abs() %>% median())) %>%
+  lapply(. %>% .[1:(length(.) - 3)]) %>%
+  lapply(. %>% apply(2, . %>% .[!is.na(.)] %>% sum())) %>%
+  bind_rows(.id = "Label")
+```
+```{r fig.height=7, fig.width=8, message=FALSE, warning=FALSE}
+labels %>%
+  lapply(report__genome.abundance_label) %>%
+  {
+    .$glnA / .$gcvT + theme(axis.text.x = element_text(size = 7)) + plot_layout(guides = "collect")
+  }
+```
+
+- Genes that use ammonia to synthesize organic matter
+    or decompose organic matter to produce ammonia
+    are widely distributed and abundant in all samples and various classes.
+    The relative abundance of glnA and gcvT in slope is higher than that in bottom environment.
+- Except CPS1, which is only found in Nitrospirales.
+
+### E3.5.5.1, ureC
+```{r}
+labels <- c("E3.5.5.1", "ureC") %>%
+  {
+    names(.) <- .
+    .
+  }
+
+labels %>%
+  lapply(. %>% genome_group(. %>% abs() %>% median())) %>%
+  lapply(. %>% .[1:(length(.) - 3)]) %>%
+  lapply(. %>% apply(2, . %>% .[!is.na(.)] %>% sum())) %>%
+  bind_rows(.id = "Label")
+
+labels %>%
+  lapply(
+    . %>%
+      genome_group(. %>% abs() %>% median()) %>%
+      {
+        split(.[1:4], as.character(.[, 5]))
+      } %>%
+      lapply(. %>%
+        {
+          .[is.na(.)] <- 0
+          .
+        }) %>%
+      lapply(. %>% apply(., 2, sum)) %>%
+      bind_rows(.id = "Class")
+  ) %>%
+  bind_rows(.id = "Label") %>%
+  .[.[3:length(.)] %>%
+    apply(1, max) %>%
+    order() %>%
+    rev(), ] %>%
+  as.data.frame()
+```
+```{r fig.height=7, fig.width=8, message=FALSE, warning=FALSE}
+labels %>%
+  lapply(report__genome.abundance_label) %>%
+  {
+    .$E3.5.5.1 / .$ureC + theme(axis.text.x = element_text(size = 7)) + plot_layout(guides = "collect")
+  }
+```
+
+- The gene involved in urea reduction and nitrile reduction are also widespread.
+- However, while ureC is more abundant in water,
+    the relative abundance of E3.5.5.1 is higher in the sediment.
+- MAGs from Alphaproteobacteria have the potential to degrade ureC in all environments,
+    However, the ureC from Gammaproteobacteria and Actinomycetia are more abundant in the bottom water,
+    while Nitrososphaeria is the most important urea degrader in other samples.
+
+
+## Nitrogen species transport
+### amt | ammonia
+```{r}
+labels <- c("amt") %>%
+  {
+    names(.) <- .
+    .
+  }
+
+labels %>%
+  lapply(. %>% genome_group(. %>% abs() %>% median())) %>%
+  lapply(. %>% .[1:(length(.) - 3)]) %>%
+  lapply(. %>% apply(2, . %>% .[!is.na(.)] %>% sum())) %>%
+  bind_rows(.id = "Label")
+```
+```{r fig.height=4, fig.width=8, message=FALSE, warning=FALSE}
+labels %>%
+  lapply(report__genome.abundance_label) %>%
+  {
+    .$amt + theme(axis.text.x = element_text(size = 7)) + plot_layout(guides = "collect")
+  }
+```
+
+- Ammonia transporter amt can be found in various classes.
+
+### nrtABC
+```{r}
+labels <- c("nrtA", "nrtB", "nrtC") %>%
+  {
+    names(.) <- .
+    .
+  }
+
+labels %>%
+  lapply(. %>% genome_group(. %>% abs() %>% median())) %>%
+  lapply(. %>% .[1:(length(.) - 3)]) %>%
+  lapply(. %>% apply(2, . %>% .[!is.na(.)] %>% sum())) %>%
+  bind_rows(.id = "Label")
+
+labels %>%
+  lapply(
+    . %>%
+      genome_group(. %>% abs() %>% median()) %>%
+      {
+        select_rows <-
+          .[1:(length(.) - 3)] %>%
+          lapply(., . %>% order(decreasing = TRUE) %>% head(2)) %>%
+          unlist() %>%
+          unique()
+        .[select_rows, ]
+      }
+  ) %>%
+  bind_rows(.id = "Label") %>%
+  .[.[3:(length(.) - 3)] %>%
+    apply(1, . %>% .[!is.na(.)] %>% max()) %>%
+    order() %>%
+    rev(), ]
+```
+```{r fig.height=10, fig.width=8, message=FALSE, warning=FALSE}
+labels %>%
+  lapply(report__genome.abundance_label) %>%
+  {
+    .$nrtA / .$nrtB / .$nrtC + theme(axis.text.x = element_text(size = 7)) + plot_layout(guides = "collect")
+  }
+```
+
+- nrt genes are only abundant found in the bottom water,
+    and most of these genes are annotated from Gammaproteobacteria,
+    which is also abundant in these environments.
+    - The nrt annoated from Alteromonas macleodii and Halomonas aquamarina are highest in bottom water.
+
+### nrtD
+```{r}
+labels <- c("nrtD") %>%
+  {
+    names(.) <- .
+    .
+  }
+
+genome_group(labels, . %>% abs() %>% median())
+```
+```{r fig.height=4, fig.width=8, message=FALSE, warning=FALSE}
+labels %>%
+  lapply(report__genome.abundance_label) %>%
+  {
+    .$nrtD + theme(axis.text.x = element_text(size = 7)) + plot_layout(guides = "collect")
+  }
+```
+
+- However, the relative abundance of nrtD is much lower and only found in a MAG annotated as Lentisphaeria.
+
+### NRT
+```{r}
+labels <- c("NRT") %>%
+  {
+    names(.) <- .
+    .
+  }
+
+labels %>%
+  lapply(. %>% genome_group(. %>% abs() %>% median())) %>%
+  lapply(. %>% .[1:(length(.) - 3)]) %>%
+  lapply(. %>% apply(2, . %>% .[!is.na(.)] %>% sum())) %>%
+  bind_rows(.id = "Label")
+```
+```{r fig.height=4, fig.width=8, message=FALSE, warning=FALSE}
+labels %>%
+  lapply(report__genome.abundance_label) %>%
+  {
+    .$NRT + theme(axis.text.x = element_text(size = 7)) + plot_layout(guides = "collect")
+  }
+```
+
+- The general nitrate/nitrite gene is also abundant in all environments
+    and have been fund in widespread classes.
+
+
+## Others
+## Hydroxylamine -> Ammonia
+### hcp
+```{r}
+labels <- c("hcp") %>%
+  {
+    names(.) <- .
+    .
+  }
+
+genome_group(labels, . %>% abs() %>% median())
+```
+- hcp only found in a few MAGs, and the abundance is lower compared to other genes.
+
+### nos, ncd
+```{r}
+labels <- c("nos", "ncd") %>%
+  {
+    names(.) <- .
+    .
+  }
+
+labels %>%
+  lapply(. %>% genome_group(. %>% abs() %>% median())) %>%
+  lapply(. %>% .[1:(length(.) - 3)]) %>%
+  lapply(. %>% apply(2, . %>% .[!is.na(.)] %>% sum())) %>%
+  bind_rows(.id = "Label")
+```
+```{r fig.height=7, fig.width=8, message=FALSE, warning=FALSE}
+labels %>%
+  lapply(report__genome.abundance_label) %>%
+  {
+    .$nos / .$ncd + theme(axis.text.x = element_text(size = 7)) + plot_layout(guides = "collect")
+  }
+```
+
+- The abundance of nos is also lower than much other genes, especially in bottom water.
+- On the contrary, the abundance of ncd is much higher, especially in bottom water,
+    indicating the importance of nitroalkane in the trench environment.
+
+## General comparation
+```{r general, message=FALSE, warning=FALSE}
+df %>%
+  split(.$Group) %>%
+  lapply(. %>%
+    {
+      split(.[-(1:4)], .$Layer %>% as.character())
+    }) %>%
+  lapply(. %>% lapply(. %>% apply(2, . %>% .[!is.na(.)] %>% abs() %>% sum()))) %>%
+  lapply(. %>% bind_rows()) %>% # .id = "Layer"))
+  lapply(. %>% apply(2, . %>% .[. > 0] %>% median())) %>%
+  bind_rows(.id = "Group") %>%
+  column_to_rownames("Group") %>%
+  t() %>%
+  as.data.frame() %>%
+  rownames_to_column("Label") %>%
+  merge(key_genes_N[c("Label", "KO", "Pathway")]) %>%
+  .[order(.$Pathway), ]
+```

@@ -1,0 +1,389 @@
+<!--
+ * @Date: 2022-08-09 14:14:54
+ * @LastEditors: Hwrn
+ * @LastEditTime: 2022-09-08 14:57:20
+ * @FilePath: /2021_09-MT10kSW/results/Rmd/check_results.Rmd
+ * @Description:
+-->
+Results
+===
+
+```{r setup, include=FALSE}
+knitr::opts_knit$set(root.dir = "~/Work/2021_09-MT10kSW/")
+```
+
+```{r config, message=FALSE, warning=FALSE}
+source("workflow/utils/RLib.local/R/init.r", chdir = TRUE)
+```
+
+```{r load_data, cache=TRUE, dependson=c("config")}
+taxon_color <- load__taxon_color()
+
+Stdb <- load__Stdb()
+Wtdb <- load__Wtdb()
+genome_taxonomy <- load__genome_taxonomy(Stdb, Wtdb)
+
+genome_rltabd <-
+  stringr::str_glue("Wtdb.relative_abundance.tsv") %>%
+  file_path$file_path$results() %>%
+  as.character() %>%
+  get_relative_abundance(genome_taxonomy) %>%
+  mutate(
+    Taxa_label = sapply(taxon.split(get("Taxonomy"), 1, 7), get_taxon_color)
+  )
+```
+
+- Here, we collected seawater samples
+    from `r length(unique(sample_meta[sample_meta$Layers == "water", "Site"]))` sites across the slope and bottom-axis of the CD, and
+    analyzed together with sediment samples with similar water depth from eight sites in previous study.
+- Analyses of `r dim(sample_meta)[1]` metagenomes and `r dim(Stdb)[1]` metagenome-assembled genomes (MAGs)
+    revealed distinct composition of prokaryotic communities in seawater and sediments at bottom-axis of CD.
+- However, more similar composition was observed between seawater and sediments at slope.
+
+```{r genome_prevalence_across_group, dependson=c("load_data")}
+annotation_genomes <-
+  get_taxon_group(genome_rltabd, "Genome", "Group") %>%
+  {
+    rownames(.) <- .$Genome %>% gsub("^(.+)$", "\\1.fa", .)
+    .$Genome <- NULL
+    .
+  }
+n_genomes_in_group <-
+  annotation_genomes %>%
+  apply(2, . %>%
+    {
+      sum(. != "")
+    })
+genome_prevalence_across_group <-
+  annotation_genomes %>%
+  split(
+    apply(., 1, . %>% paste(collapse = ""))
+  ) %>%
+  lapply(function(df) {
+    n_genomes_in_this_group <- df[1, ] %>%
+      .[. != ""] %>%
+      n_genomes_in_group[.]
+    c(unique(df),
+      Genomes = dim(df)[1],
+      Percent = (dim(df)[1] / sum(n_genomes_in_this_group)) %>% round(4)
+    )
+  }) %>%
+  bind_rows(.id = "Group_label") %>%
+  column_to_rownames("Group_label")
+
+genome_prevalence_across_group
+```
+
+- Seawater samples at the bottom-axis show the most specificity than other testes samples,
+  which have `r genome_prevalence_across_group["Bw", "Percent"] * 100`% specific species at MAG level
+  (`r ifelse("Sw" %in% rownames(genome_prevalence_across_group), genome_prevalence_across_group["Sw", "Percent"], 0) * 100`% MAGs found in slope seawater are absence in other groups,
+  `r genome_prevalence_across_group["Bs", "Percent"] * 100`% in bottom sediments and
+  `r genome_prevalence_across_group["Ss", "Percent"] * 100`% in slope sediments, respectively).
+- The difference in prokaryotic composition between water and sediment at the slope and bottom
+    is functionally responsible for the distinct capabilities in the N cycling process:
+    a potential stronger nitrogen loss from nitrification in seawater at the bottom of CD,
+    while a nitrogen recycles at the slope through nitrogen fixation to ammonia and ammonia oxidation to nitrate.
+
+
+## Methods
+```{r}
+sample.log <- "
+Site   | Layer | Raw reads pairs | Clean reads pairs
+TY.044 | water |     52876904    |     50400486
+TY.041 | water |     60268395    |     59411501
+TY.040 | water |     54401230    |     52097922
+YW.021 | water |     55766716    |     55319739
+WQ.022 | water |     68320893    |     67839251
+YW.020 | water |     59236043    |     58804951
+WQ.024 | water |     76446504    |     75518696
+YW.019 | water |     62709177    |     62186093
+WQ.021 | water |     65934699    |     65314107
+YW.023 | water |     50321128    |     49906256
+" %>%
+  textConnection() %>%
+  {
+    data <- read.csv(., sep = "|")
+    close(.)
+    data
+  }
+
+sample.log2 <- "
+Site   | SeqNumbers | MaxLength | GenomeSize |  N50
+TY.044 |   480653   |   189618  |  530453602 | 1266
+TY.041 |   671837   |   272833  |  814160179 | 1289
+TY.040 |   669463   |   138538  |  700544315 | 1358
+T1L6   |   698160   |    92345  |  625995281 |  830
+T1B10  |   963540   |   342441  |  960386196 |  830
+T1B11  |   214163   |   345318  |  231596345 |  925
+YW.021 |   293147   |  1065244  |  552083548 | 3224
+WQ.022 |   192243   |  1592666  |  336384365 | 2437
+YW.020 |   308094   |   881722  |  559512074 | 2773
+WQ.024 |   309611   |   669602  |  556555548 | 2931
+YW.019 |   219702   |   691672  |  368471939 | 2141
+WQ.021 |   243095   |  1231312  |  466699531 | 3225
+YW.023 |   223371   |   571787  |  440850287 | 3593
+T3L11  |  1894425   |   133816  | 1768025214 |  768
+T3L8   |   697406   |   110004  |  642045861 |  747
+T3L14  |  1189557   |   123418  | 1155399924 |  935
+T1L10  |  1894075   |   238282  | 1866414119 |  885
+" %>%
+  textConnection() %>%
+  {
+    data <- read.csv(., sep = "|")
+    close(.)
+    data
+  }
+
+sample.log3 <- "
+Sample | Layer  | Mapping rate
+TY.044 | water  | 27.08
+TY.041 | water  | 51.72
+TY.040 | water  | 35.41
+T1L6   | R1.0-3 | 45.15
+T1L6   | R2.0-3 | 41.52
+T1B10  | 0-2    | 43.23
+T1B10  | 36-38  | 48.71
+T1B10  | 44-46  | 52.72
+T1B11  | 0-3    | 50.42
+YW.021 | water  | 87.98
+WQ.022 | water  | 88.35
+YW.020 | water  | 87.60
+WQ.024 | water  | 88.69
+YW.019 | water  | 91.48
+WQ.021 | water  | 84.53
+YW.023 | water  | 87.60
+T3L8   | 0-3    | 41.49
+T3L8   | 6-9    | 39.06
+T3L8   | 12-15  | 42.91
+T3L8   | 18-21  | 27.29
+T3L14  | 0-2    | 49.02
+T3L14  | 4-6    | 45.96
+T3L14  | 6-8    | 49.93
+T3L14  | 12-14  | 45.04
+T3L14  | 18-20  | 38.65
+T3L11  | 0-3    | 49.48
+T3L11  | 6-9    | 49.27
+T3L11  | 12-15  | 46.87
+T3L11  | 18-21  | 35.22
+T1L10  | 0-3    | 48.62
+T1L10  | 6-9    | 51.58
+T1L10  | 12-15  | 48.00
+T1L10  | 18-21  | 42.26
+" %>%
+  textConnection() %>%
+  {
+    data <- read.csv(., sep = "|")
+    close(.)
+    data
+  }
+```
+
+- The shot-gun sequencing of ten near-benthic seawater samples
+    yielded `r prettyNum(mean(sample.log$Clean.reads.pairs), big.mark = ",")` clean raw read pairs per sample after being trimmed and filtered,
+    composing `r round(mean(sample.log$Clean.reads.pairs / sample.log$Raw.reads.pairs), 4) * 100`% of the raw reads (Methods).
+- In addition, we collected 23 metagenomes at seven stations of sediment samples
+    from the bottom-axis (four stations) and southern slope (three stations) of the Challenger Deep as comparisons
+    (Fig. 1, Additional file: Table S1) [Ref: 2022, NC, Microbiomes in the Challenger Deep slope and bottom-axis sediments].
+- Assembly of the above 33 metagenomes generated `r prettyNum(sum(sample.log2$SeqNumbers), big.mark = ",")` scaffolds
+    (average length `r round(sum(sample.log2$GenomeSize) / sum(sample.log2$SeqNumbers), 1)` bp).
+
+```{r}
+Stdb.quality <- Stdb %>%
+  {
+    assign_quality(.$Completeness, .$Contamination)
+  }
+```
+- Binning of these contigs resulted in `r dim(Stdb)[1]` draft genomes
+    with qualities above the middle-quality threshold ($\ge 50\%$ completeness and $\le 10\%$ contamination) clustered into `r dim(Wtdb)[1]` clusters,
+    among which `r summary(Stdb.quality)["high"]` were above the high-quality threshold ($\ge 90\%$ completeness and $\le 5\%$ contamination)
+    according to a widely accepted standard of MAGs [Ref: Minimum information about a single amplified genome (MISAG) and a metagenome-assembled genome (MIMAG) of bacteria and archaea].
+- Quality-controlled reads from all metagenomes had relatively high mapping rates (`r round(mean(sample.log3$Mapping.rate), 2)`%) to all MAGs above the middle-quality threshold,
+    suggesting an acceptable representation and quality for the use of these MAGs to reflect the prokaryotic community in further analyses.
+
+```{r}
+div.phyloflash.raw <-
+  file_path$file_path$otus("phyloFlash_raw") %>%
+  as.character() %>%
+  read.csv() %>%
+  {
+    .$Site <- gsub(
+      "^.+phyloFlash\\.\\.(.+)\\.\\.(.+)\\.csv$", "\\1..\\2", .$File
+    )
+    .
+  } %>%
+  reshape2::acast(formula("OTU ~ Site"), value.var = "Reads", fill = 0)
+
+div.lastannot <- sapply(
+  as.character(taxon.levels),
+  function(x) {
+    div.phyloflash.raw %>%
+      {
+        .[!taxon.split(rownames(.), x) %>% grepl(pattern = "^\\([^;]+\\)$", .), ]
+      } %>% # > 0,#,
+      apply(2, sum)
+  }
+)
+```
+- A total of `r prettyNum(sum(div.phyloflash.raw), big.mark = ",")` reads were mapped to
+    `r dim(div.phyloflash.raw)[1]` Molecular Operational Taxonomic Unit (mOTU) sequences
+    at the species level or higher based on the MiTAG method using phyloFlash (v3.4).
+- `r round(mean(div.lastannot[, "class"] / div.lastannot[, "domain"]), 4) *100`% mOTUs
+    can be annotated to class level in all samples,
+    therefore, we further use class-level taxa to describe the community compositions among four groups which are slope seawater (Sw), slope sediments (Ss), bottom seawater (Bs) and bottom sediments (Bs).
+
+```{r}
+ref_genome_info <- read.csv("04_bin/03_reference/genome_info.csv")
+venn_phylum <-
+  genome_rltabd %>%
+  {
+    .$Phylum <- .$Taxonomy %>% taxon.split(1, 2)
+    .
+  } %>%
+  {
+    split(.$Phylum, .$Group)
+  } %>%
+  lapply(unique)
+```
+- We constructed a phylogenetic tree by using
+    `r sum(genome_prevalence_across_group[(!genome_prevalence_across_group$Ss == "") | (!genome_prevalence_across_group$Sw == ""), "Genomes"])` representative MAGs
+    (dereplicated at 95% average nucleotide identity (ANI)) at slope and
+    `r sum(genome_prevalence_across_group[(!genome_prevalence_across_group$Bs == "") | (!genome_prevalence_across_group$Bw == ""), "Genomes"])` representative MAGs at bottom
+    together with `r dim(ref_genome_info)[1]` reference genomes from the GTDB [13] (Methods, Fig. 3).
+- These MAGs were distributed into
+    `r length(unique(c(venn_phylum$Ss, venn_phylum$Sw)))` phyla in samples at slope while
+    `r length(unique(c(venn_phylum$Bs, venn_phylum$Bw)))` phyla in samples at bottom.
+
+```{r}
+freq.phylum <-
+  genome_taxonomy$Taxonomy %>%
+  taxon.split(1, 2) %>%
+  split(taxon.split(., 1)) %>%
+  lapply(as.character) %>%
+  lapply(table)
+```
+- The MAGs encompassed `r length(freq.phylum$Bacteria)` bacterial and `r length(freq.phylum$Archaea)` archaeal phyla (Fig. 1; Table S2).
+    The five most abundant bacterial phyla in our data set were
+    `r paste(taxon.split(names(head(sort(unlist(freq.phylum), decreasing = TRUE), 4)), 2), collapse = ", ")`, and `r taxon.split(names(sort(unlist(freq.phylum), decreasing = TRUE)[5]), 2)`.
+    `r sum(unlist(freq.phylum) == 1)` other phyla were each represented by only a single MAG.
+        This included the `r taxon.split(names(unlist(freq.phylum)), 2)[unlist(freq.phylum) == 1]`.
+
+```{r}
+v <- list(
+  bw.dom =
+    genome_rltabd %>%
+      filter(get("Group") == "Bw") %>%
+      filter(
+        grepl(
+          paste("Gammaproteobacteria", "Alphaproteobacteria",
+                "Actinomycetia", "Bacteroidota", sep = "|"),
+          get("Taxonomy")
+        )
+      ) %>%
+      group_by(Sample = get("Sample")) %>%
+      summarise(Abundance = sum(get("Relative_abundance"))) %>%
+      .$Abundance %>%
+      summary() %>%
+      lapply(. %>% prettyNum(digits = 3)),
+  bw.gammaprot =
+    genome_rltabd %>%
+      filter(get("Group") == "Bw") %>%
+      filter(
+        grepl(
+          paste("Gammaproteobacteria", sep = "|"),
+          get("Taxonomy")
+        )
+      ) %>%
+      group_by(Sample = get("Sample")) %>%
+      summarise(Abundance = sum(get("Relative_abundance"))) %>%
+      .$Abundance %>%
+      summary() %>%
+      lapply(. %>% prettyNum(digits = 3)),
+  s.gammaprot =
+    genome_rltabd %>%
+      filter(get("Group") %in% c("Bs", "Ss")) %>%
+      filter(
+        grepl(
+          paste("Gammaproteobacteria", sep = "|"),
+          get("Taxonomy")
+        )
+      ) %>%
+      group_by(Sample = get("Sample")) %>%
+      summarise(Abundance = sum(get("Relative_abundance"))) %>%
+      .$Abundance %>%
+      summary() %>%
+      lapply(. %>% prettyNum(digits = 3)),
+  s.dom =
+    genome_rltabd %>%
+      filter(get("Group") %in% c("Bs", "Ss")) %>%
+      filter(
+        grepl(
+          paste("Nitrososphaeria", "Marinisomatota", "Gemmatimonadota",
+                "Planctomycetota", "Chloroflexota", sep = "|"),
+          get("Taxonomy")
+        )
+      ) %>%
+      group_by(Sample = get("Sample")) %>%
+      summarise(Abundance = sum(get("Relative_abundance"))) %>%
+      .$Abundance %>%
+      summary() %>%
+      lapply(. %>% prettyNum(digits = 3)),
+  bw.s.dom =
+    genome_rltabd %>%
+      filter(get("Group") %in% c("Bw")) %>%
+      filter(
+        grepl(
+          paste("Nitrososphaeria", "Marinisomatota", "Gemmatimonadota",
+                "Planctomycetota", "Chloroflexota", sep = "|"),
+          get("Taxonomy")
+        )
+      ) %>%
+      group_by(Sample = get("Sample")) %>%
+      summarise(Abundance = sum(get("Relative_abundance"))) %>%
+      .$Abundance %>%
+      summary() %>%
+      lapply(. %>% prettyNum(digits = 3)),
+  s.top3 =
+    genome_rltabd %>%
+    filter(get("Group") %in% c("Sw", "Ss")) %>%
+    group_by(Sample = get("Sample"), Class = taxon.split(get("Taxonomy"), 3)) %>%
+    summarize(Abundance = sum(get("Relative_abundance"))) %>%
+    group_by(Sample = get("Sample")) %>%
+    mutate(Rank = rank(-get("Abundance"))) %>%
+    filter(get("Rank") <= 3) %>%
+    .$Class %>%
+    table %>%
+    .[. > 0] %>%
+    .[order(-.)] %>%
+    head(3),
+  s.bw.gammaprot.rate =
+    genome_rltabd %>%
+    filter(get("Group") %in% c("Sw", "Ss", "Bw")) %>%
+    filter(
+      grepl(
+        paste("Gammaproteobacteria", sep = "|"),
+        get("Taxonomy")
+      )
+    ) %>%
+    group_by(Sample = get("Sample"), Group = get("Group")) %>%
+    summarise(Abundance = sum(get("Relative_abundance"))) %>%
+    group_by(Group = get("Group") == "Bw") %>%
+    summarise(Mean = mean(get("Abundance"))) %>%
+    column_to_rownames("Group") %>%
+    {
+      .["FALSE", "Mean"] / .["TRUE", "Mean"]
+    }
+)
+```
+
+- The community composition of the prokaryotes in seawater and sediments were completely distinct in the bottom of the CD (Fig. 1, Supplemental Fig. S2).
+  For bottom seawater, Gammaproteobacteria, Alphaproteobacteria, Actinomycetia, and Bacteroidota were dominated
+  accounting for more than `r v$bw.dom$Min.`% of the total,
+  in which Gammaproteobacteria was the most abundant class-level clade 
+  with `r v$bw.gammaprot$Min.`-`r v$bw.gammaprot$Max.`% in all seven bottom seawater samples.
+  However, the dominant taxa in class level of the bottom sediments are clearly more diverse and in significantly different proportions than those in bottom seawater.
+  Although the Gammaproteobacteria is still among the dominant clade,
+  its proportion is significant lower with less than `r v$s.gammaprot$Max.`% in the communities of all bottom sediments (Fig. 1C, Supplemental Fig. S2, Supplemental Table S2).
+  In contrast, Nitrososphaeria, Marinisomatota, Gemmatimonadota, Planctomycetota (Phycisphaerae and others), Chloroflexota (Dehalococcoidia and others)
+  account for a unignorable proportion (up to ~ `r v$s.dom$Max.`%),
+  of which the proportions are quite low among all samples in the bottom seawater 
+  which are less than `r v$bw.s.dom$Max.`%.
