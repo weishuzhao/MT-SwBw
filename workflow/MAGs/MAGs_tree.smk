@@ -1,19 +1,20 @@
-#include:
+# include:
 #    "MAGs.smk"
-#include:
+# include:
 #    "../MAGs_tpm/MAGs_tpm.smk"
 
 
 rule get_ref_genomes:
     input:
-        Wtdb = Wtdb,
+        Wtdb=Wtdb,
     output:
-        reference_genome_info = file_path.all_bins("ref_genome_info.csv"),
-        reference_genome_dir  = directory(file_path.all_bins("ref_genome")),
-        reference_gene_dir    = directory(file_path.all_bins("ref_gene")),
-        reference_gene_map    = file_path.all_bins("ref_gene_map.csv"),
+        reference_genome_info=file_path.all_bins("ref_genome_info.csv"),
+        reference_genome_dir=directory(file_path.all_bins("ref_genome")),
+        reference_gene_dir=directory(file_path.all_bins("ref_gene")),
+        reference_gene_map=file_path.all_bins("ref_gene_map.csv"),
     threads: THREADS
-    message: "check and DELETE the STUPID GCA_013288705.1.fna"
+    message:
+        "check and DELETE the STUPID GCA_013288705.1.fna"
     shell:
         """
             set +u
@@ -31,20 +32,22 @@ rule get_ref_genomes:
 
 
 tree_prefix_expr = str(file_path.bins_tree("{bottom_or_slope}_mid_{min_exist_marker}"))
+
+
 rule fetchMG_to_one_tree:
     input:
-        Wtdb = Wtdb,
-        collect_gene = collect_gene,
-        reference_gene_dir = file_path.all_bins("ref_gene"),
-        genome_abds = genome_abds,
+        Wtdb=Wtdb,
+        collect_gene=collect_gene,
+        reference_gene_dir=file_path.all_bins("ref_gene"),
+        genome_abds=genome_abds,
     output:
-        afa    = f"{tree_prefix_expr}.afa",
-        trimal = f"{tree_prefix_expr}.afa.trimal",
-        tree   = f"{tree_prefix_expr}.afa.trimal.fasttree",
+        afa=f"{tree_prefix_expr}.afa",
+        trimal=f"{tree_prefix_expr}.afa.trimal",
+        tree=f"{tree_prefix_expr}.afa.trimal.fasttree",
     params:
-        tree   = f"{tree_prefix_expr}",
-        bottom_or_slope  = "{bottom_or_slope}",
-        min_exist_marker = "{min_exist_marker}",
+        tree=f"{tree_prefix_expr}",
+        bottom_or_slope="{bottom_or_slope}",
+        min_exist_marker="{min_exist_marker}",
     threads: THREADS
     shell:
         """
@@ -64,10 +67,30 @@ rule fetchMG_to_one_tree:
         """
 
 
+rule trimal2iqtree:
+    input:
+        trimal=f"{tree_prefix_expr}.afa.trimal",
+    output:
+        tree=f"{tree_prefix_expr}.afa.trimal.iqtree",
+    threads: THREADS
+    shell:
+        """
+            set +u
+            source workflow/utils/.conda_init
+            conda activate python39
+
+        iqtree \
+            -s {input.trimal} \
+            -m MFP -B 1000 --bnni -T AUTO \
+            -T {threads} \
+        | tee {output.tree}
+        """
+
+
 rule fetchMG_to_trees:
     input:
-        trees = [
-            f"{tree_prefix_expr}.afa.trimal.fasttree".format(
+        trees=[
+            f"{tree_prefix_expr}.afa.trimal.iqtree".format(
                 bottom_or_slope=bottom_or_slope, min_exist_marker=min_exist_marker
             )
             for bottom_or_slope in ["all", "slope", "bottom"]
@@ -81,9 +104,9 @@ rule fetchMG_to_trees:
 
 rule trees_itol_annots:
     input:
-        Wtdb_abds = file_path.results(f"Wtdb.relative_abundance.tsv"),
+        Wtdb_abds=file_path.results(f"Wtdb.relative_abundance.tsv"),
     output:
-        table2itol = directory(file_path.bins_tree("table2itol")),
+        table2itol=directory(file_path.bins_tree("table2itol")),
     message:
         "Warning: may modify file '04_bin/04_tree/table2itol.csv' manually"
     shell:
