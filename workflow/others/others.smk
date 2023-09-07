@@ -1,7 +1,7 @@
 """
  * @Date: 2022-06-28 20:33:42
  * @LastEditors: Hwrn hwrn.aou@sjtu.edu.cn
- * @LastEditTime: 2023-04-23 17:12:47
+ * @LastEditTime: 2023-09-07 21:47:22
  * @FilePath: /2021_09-MT10kSW/workflow/others/others.smk
  * @Description:
 """
@@ -38,6 +38,7 @@ rule draw_fig2:
         genome_abds=genome_abds,
         Stdb=Stdb,
         Wtdb=Wtdb,
+        r="workflow/others/draw_fig2.r",
     output:
         fig_relative_nmds_class=file_path.figs("fig2_relative_nmds_class"),
     shell:
@@ -46,7 +47,7 @@ rule draw_fig2:
             source workflow/utils/.conda_init
             conda activate R4.1
 
-        Rscript workflow/others/draw_fig2.r \
+        Rscript {input.r} \
             {input.genome_abds} \
             {output.fig_relative_nmds_class}
         """

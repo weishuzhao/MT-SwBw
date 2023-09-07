@@ -1,7 +1,7 @@
 """
  * @Date: 2022-05-28 23:04:47
  * @LastEditors: Hwrn hwrn.aou@sjtu.edu.cn
- * @LastEditTime: 2023-04-24 21:25:40
+ * @LastEditTime: 2023-09-07 11:47:22
  * @FilePath: /2021_09-MT10kSW/workflow/snakefile
  * @Description:
 """
@@ -68,6 +68,5 @@ include: "reads_diversity/reads_diversity.smk"
 include: "gene_annot/gene_annot.smk"
 include: "MAGs/MAGs.smk"
 include: "MAGs_tpm/MAGs_tpm.smk"
-include: "salmon/salmon.smk"
 include: "MAGs/MAGs_tree.smk"
 include: "others/others.smk"
