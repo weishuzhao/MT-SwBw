@@ -1,0 +1,446 @@
+---
+Title: Results
+Date: 2023-09-07 11:03:26
+LastEditors: Hwrn hwrn.aou@sjtu.edu.cn
+LastEditTime: 2023-09-07 16:12:25
+FilePath: /2021_09-MT10kSW/results/Rmd/check_results.1.Rmd
+Description: results
+output:
+  html_document:
+    df_print: paged
+    theme: cerulean
+    highlight: haddock
+    toc: yes
+    toc_depth: 3
+    toc_float:
+      collapsed: no
+      smooth_scroll: yes
+    code_fold: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_knit$set(root.dir = "~/Work/2021_09-MT10kSW/")
+```
+
+```{r config, message=FALSE, warning=FALSE}
+source("workflow/utils/RLib.local/R/init.r", chdir = TRUE)
+```
+
+```{r load_data, cache=TRUE, dependson=c("config")}
+taxon_color <- load__taxon_color()
+
+Stdb <- load__Stdb()
+Wtdb <- load__Wtdb()
+genome_taxonomy <- load__genome_taxonomy(Stdb, Wtdb)
+
+genome_rltabd <-
+  stringr::str_glue("Wtdb.relative_abundance.tsv") %>%
+  file_path$file_path$results() %>%
+  as.character() %>%
+  get_relative_abundance(genome_taxonomy) %>%
+  mutate(
+    Taxa_label = sapply(taxon.split(get("Taxonomy"), 1, 7), get_taxon_color)
+  )
+```
+
+```{r genome_prevalence_across_group, dependson=c("load_data")}
+annotation_genomes <-
+  get_taxon_group(genome_rltabd, "Genome", "Group") %>%
+  {
+    rownames(.) <- .$Genome %>% gsub("^(.+)$", "\\1.fa", .)
+    .$Genome <- NULL
+    .
+  }
+n_genomes_in_group <-
+  annotation_genomes %>%
+  apply(2, . %>%
+    {
+      sum(. != "")
+    })
+genome_prevalence_across_group <-
+  annotation_genomes %>%
+  split(
+    apply(., 1, . %>% paste(collapse = ""))
+  ) %>%
+  lapply(function(df) {
+    n_genomes_in_this_group <- df[1, ] %>%
+      .[. != ""] %>%
+      n_genomes_in_group[.]
+    c(unique(df),
+      Genomes = dim(df)[1],
+      Percent = (dim(df)[1] / sum(n_genomes_in_this_group)) %>% round(4)
+    )
+  }) %>%
+  bind_rows(.id = "Group_label") %>%
+  column_to_rownames("Group_label")
+
+genome_prevalence_across_group
+```
+
+## Metagenomic profile
+```{r}
+sample.log <- "
+Site   | Layer | Raw reads pairs | Clean reads pairs
+TY.044 | water |     52876904    |     50400486
+TY.041 | water |     60268395    |     59411501
+TY.040 | water |     54401230    |     52097922
+YW.021 | water |     55766716    |     55319739
+WQ.022 | water |     68320893    |     67839251
+YW.020 | water |     59236043    |     58804951
+WQ.024 | water |     76446504    |     75518696
+YW.019 | water |     62709177    |     62186093
+WQ.021 | water |     65934699    |     65314107
+YW.023 | water |     50321128    |     49906256
+" %>%
+  textConnection() %>%
+  {
+    data <- read.csv(., sep = "|")
+    close(.)
+    data
+  }
+
+sample.log2 <- "
+Site   | SeqNumbers | MaxLength | GenomeSize |  N50
+TY.044 |   480653   |   189618  |  530453602 | 1266
+TY.041 |   671837   |   272833  |  814160179 | 1289
+TY.040 |   669463   |   138538  |  700544315 | 1358
+T1L6   |   698160   |    92345  |  625995281 |  830
+T1B10  |   963540   |   342441  |  960386196 |  830
+T1B11  |   214163   |   345318  |  231596345 |  925
+YW.021 |   293147   |  1065244  |  552083548 | 3224
+WQ.022 |   192243   |  1592666  |  336384365 | 2437
+YW.020 |   308094   |   881722  |  559512074 | 2773
+WQ.024 |   309611   |   669602  |  556555548 | 2931
+YW.019 |   219702   |   691672  |  368471939 | 2141
+WQ.021 |   243095   |  1231312  |  466699531 | 3225
+YW.023 |   223371   |   571787  |  440850287 | 3593
+T3L11  |  1894425   |   133816  | 1768025214 |  768
+T3L8   |   697406   |   110004  |  642045861 |  747
+T3L14  |  1189557   |   123418  | 1155399924 |  935
+T1L10  |  1894075   |   238282  | 1866414119 |  885
+" %>%
+  textConnection() %>%
+  {
+    data <- read.csv(., sep = "|")
+    close(.)
+    data
+  }
+
+sample.log3 <- "
+Sample | Layer  | Mapping rate
+TY.044 | water  | 27.08
+TY.041 | water  | 51.72
+TY.040 | water  | 35.41
+T1L6   | R1.0-3 | 45.15
+T1L6   | R2.0-3 | 41.52
+T1B10  | 0-2    | 43.23
+T1B10  | 36-38  | 48.71
+T1B10  | 44-46  | 52.72
+T1B11  | 0-3    | 50.42
+YW.021 | water  | 87.98
+WQ.022 | water  | 88.35
+YW.020 | water  | 87.60
+WQ.024 | water  | 88.69
+YW.019 | water  | 91.48
+WQ.021 | water  | 84.53
+YW.023 | water  | 87.60
+T3L8   | 0-3    | 41.49
+T3L8   | 6-9    | 39.06
+T3L8   | 12-15  | 42.91
+T3L8   | 18-21  | 27.29
+T3L14  | 0-2    | 49.02
+T3L14  | 4-6    | 45.96
+T3L14  | 6-8    | 49.93
+T3L14  | 12-14  | 45.04
+T3L14  | 18-20  | 38.65
+T3L11  | 0-3    | 49.48
+T3L11  | 6-9    | 49.27
+T3L11  | 12-15  | 46.87
+T3L11  | 18-21  | 35.22
+T1L10  | 0-3    | 48.62
+T1L10  | 6-9    | 51.58
+T1L10  | 12-15  | 48.00
+T1L10  | 18-21  | 42.26
+" %>%
+  textConnection() %>%
+  {
+    data <- read.csv(., sep = "|")
+    close(.)
+    data
+  }
+```
+
+- The shot-gun sequencing of ten near-benthic seawater samples
+    yielded `r prettyNum(mean(sample.log$Clean.reads.pairs), big.mark = ",")`
+    clean raw read pairs per sample after being trimmed and filtered,
+  composing
+    `r round(mean(sample.log$Clean.reads.pairs / sample.log$Raw.reads.pairs), 4) * 100`%
+    of the raw reads (Methods).
+- In addition, we collected 23 metagenomes at seven sediment sampling stations
+  (four stations at the bottom and three stations on the slope)
+  in the CD for comparison (Fig. 1, Supplemental Table S1).
+- All the 33 samples
+    were divided into four groups according to sampling site:
+      slope seawater (Sw),
+      slope sediments (Ss),
+      bottom seawater (Bw),
+      and bottom sediments (Bs).
+- Assembly of the 33 metagenomes above generated
+    `r prettyNum(sum(sample.log2$SeqNumbers), big.mark = ",")` scaffolds
+    (average length of
+      `r round(sum(sample.log2$GenomeSize) / sum(sample.log2$SeqNumbers))`
+      bp).
+
+```{r}
+Stdb.quality <- with(Stdb, assign_quality(Completeness, Contamination))
+```
+
+- Binning of these contigs resulted in `r dim(Stdb)[1]` draft genomes
+    with qualities above the middle-quality threshold
+      ($\ge 50\%$ completeness and $\le 10\%$ contamination),
+    among which `r summary(Stdb.quality)["high"]`
+    were above the high-quality threshold
+      ($\ge 90\%$ completeness and $\le 5\%$ contamination)
+      according to widely-accepted MAG/SAG standards.
+- To represent a species-level clade across samples in the study,
+  draft genomes were collected from different samples for de-replication,
+  and the resulting `r dim(Wtdb)[1]` genomes
+    are hereafter referred to as the MAG (metagenome assembled genome).
+
+## Comparison of the prokaryotic community between seawater and sediment on the slope and bottom
+```{r}
+sample_meta_cross <-
+  read.csv("results/reads_diversity/metadata.tsv", sep = "\t") %>%
+  mutate(
+    X = get("Sample"),
+    Layer = ifelse(
+      get("Type") == "16s", get("Sample"), gsub("^[^_]+_", "", get("Sample"))
+    ),
+    Sample = paste0(get("Group"), "_", get("Layer"))
+  ) %>%
+  merge(unique(sample_meta[c("Location", "Group")]))
+
+otu_count <-
+  "results/reads_diversity/level-7.csv" %>%
+  {
+    df <- read.csv(.)
+    colnames(df) <-
+      c("X", read.csv(., header = FALSE)[1, -1])
+    df
+  } %>%
+  dplyr::select(
+    -c("Layers", "Depth", "Latitude", "Longitude", "Location", "Group")
+  ) %>%
+  pivot_longer(!c("X"), names_to = "Taxonomy", values_to = "ReadsCount") %>%
+  merge(sample_meta_cross) %>%
+  filter(get("ReadsCount") > 0)
+
+genome_rltabd %>%
+  get_total_ce(value.name = "Relative.abundance") %>%
+  .$Total
+
+otu_count %>% group_by(get("Sample")) %>% summarise(Total = sum(get("ReadsCount")))
+```
+
+- The relative abundance of MAGs were used to describe the community structure,
+  and `r sum(sample_meta_cross$Type == "16S")` 16S rRNA samples are also used
+    for comparison.
+  A total of `r length(unique(otu_count$Taxonomy))` species are identified 
+    with `r prettyNum(sum(otu_count$ReadsCount))` reads in 16S data.
+  Using NMDS to demonstrate 
+    the differences in species-level taxa among various samples,
+  we found that both the 16S and metagenomic data showed
+    significant differences between different sample groups,
+  except that the Bs and Ss were very similar in the 16S data.
+  
+- To compare community structure provided by both type of samples,
+  we manually corrected the class level annotation
+    of metagenomic and 16S data.
+  In general, when considering 
+    the prevalence of taxa at the class level in the samples,
+  NMDS showed clustering patterns that separated samples
+    both by environment (water or sediment)
+      and sequencing type (16S or metagenome)
+      (Binary Jaccard distance, Adonis test, P value < 0.001) (Fig. 2A).
+  However, when considering
+    the abundance of each class-level taxon in the community
+      among the samples of these four groups,
+  the Sw samples was much closer to the sediment samples
+    but was significantly separated from the Bw samples
+    (Bray‒Curtis distance, Adonis test, P value < 0.001) (Fig. 2B).
+
+- With respect to the taxonomic composition
+    at the phylum level and at the class level for some specific clades,
+  Gammaproteobacteria and Alphaproteobacteria 
+    were the most abundant bacterial taxa, 
+  and Marinisomatia was also abundant in some samples from the slope.
+  Nitrososphaeria 
+    (previously reported as Thaumarchaeota,
+      a typical ammonia oxidating archaea)
+    was the dominant archaea in all samples 
+      as well as an abundant taxon in most of the samples
+        except for those from the bottom seawater (Fig. 2C, Fig. S2_2?).
+
+```{r}
+ref_genome_info <- read.csv("04_bin/03_reference/genome_info.csv")
+venn_phylum <-
+  genome_rltabd %>%
+  {
+    .$Phylum <- .$Taxonomy %>% taxon.split(1, 2)
+    .
+  } %>%
+  {
+    split(.$Phylum, .$Group)
+  } %>%
+  lapply(unique)
+```
+
+- We constructed a phylogenetic tree by using
+    `r sum(genome_prevalence_across_group[(!genome_prevalence_across_group$Ss == "") | (!genome_prevalence_across_group$Sw == ""), "Genomes"])` representative MAGs
+    (dereplicated at 95% average nucleotide identity (ANI)) at slope and
+    `r sum(genome_prevalence_across_group[(!genome_prevalence_across_group$Bs == "") | (!genome_prevalence_across_group$Bw == ""), "Genomes"])` representative MAGs at bottom
+    together with `r dim(ref_genome_info)[1]` reference genomes from the GTDB [13] (Methods, Fig. 3).
+- These MAGs were distributed into
+    `r length(unique(c(venn_phylum$Ss, venn_phylum$Sw)))` phyla in samples at slope while
+    `r length(unique(c(venn_phylum$Bs, venn_phylum$Bw)))` phyla in samples at bottom.
+
+```{r}
+freq.phylum <-
+  genome_taxonomy$Taxonomy %>%
+  taxon.split(1, 2) %>%
+  split(taxon.split(., 1)) %>%
+  lapply(as.character) %>%
+  lapply(table)
+```
+- The MAGs encompassed `r length(freq.phylum$Bacteria)` bacterial and `r length(freq.phylum$Archaea)` archaeal phyla (Fig. 1; Table S2).
+    The five most abundant bacterial phyla in our data set were
+    `r paste(taxon.split(names(head(sort(unlist(freq.phylum), decreasing = TRUE), 4)), 2), collapse = ", ")`, and `r taxon.split(names(sort(unlist(freq.phylum), decreasing = TRUE)[5]), 2)`.
+    `r sum(unlist(freq.phylum) == 1)` other phyla were each represented by only a single MAG.
+        This included the `r taxon.split(names(unlist(freq.phylum)), 2)[unlist(freq.phylum) == 1]`.
+
+```{r}
+v <- list(
+  bw.dom =
+    genome_rltabd %>%
+      filter(get("Group") == "Bw") %>%
+      filter(
+        grepl(
+          paste("Gammaproteobacteria", "Alphaproteobacteria",
+            "Actinomycetia", "Bacteroidota",
+            sep = "|"
+          ),
+          get("Taxonomy")
+        )
+      ) %>%
+      group_by(Sample = get("Sample")) %>%
+      summarise(Abundance = sum(get("Relative_abundance"))) %>%
+      .$Abundance %>%
+      summary() %>%
+      lapply(. %>% prettyNum(digits = 3)),
+  bw.gammaprot =
+    genome_rltabd %>%
+      filter(get("Group") == "Bw") %>%
+      filter(
+        grepl(
+          paste("Gammaproteobacteria", sep = "|"),
+          get("Taxonomy")
+        )
+      ) %>%
+      group_by(Sample = get("Sample")) %>%
+      summarise(Abundance = sum(get("Relative_abundance"))) %>%
+      .$Abundance %>%
+      summary() %>%
+      lapply(. %>% prettyNum(digits = 3)),
+  s.gammaprot =
+    genome_rltabd %>%
+      filter(get("Group") %in% c("Bs", "Ss")) %>%
+      filter(
+        grepl(
+          paste("Gammaproteobacteria", sep = "|"),
+          get("Taxonomy")
+        )
+      ) %>%
+      group_by(Sample = get("Sample")) %>%
+      summarise(Abundance = sum(get("Relative_abundance"))) %>%
+      .$Abundance %>%
+      summary() %>%
+      lapply(. %>% prettyNum(digits = 3)),
+  s.dom =
+    genome_rltabd %>%
+      filter(get("Group") %in% c("Bs", "Ss")) %>%
+      filter(
+        grepl(
+          paste("Nitrososphaeria", "Marinisomatota", "Gemmatimonadota",
+            "Planctomycetota", "Chloroflexota",
+            sep = "|"
+          ),
+          get("Taxonomy")
+        )
+      ) %>%
+      group_by(Sample = get("Sample")) %>%
+      summarise(Abundance = sum(get("Relative_abundance"))) %>%
+      .$Abundance %>%
+      summary() %>%
+      lapply(. %>% prettyNum(digits = 3)),
+  bw.s.dom =
+    genome_rltabd %>%
+      filter(get("Group") %in% c("Bw")) %>%
+      filter(
+        grepl(
+          paste("Nitrososphaeria", "Marinisomatota", "Gemmatimonadota",
+            "Planctomycetota", "Chloroflexota",
+            sep = "|"
+          ),
+          get("Taxonomy")
+        )
+      ) %>%
+      group_by(Sample = get("Sample")) %>%
+      summarise(Abundance = sum(get("Relative_abundance"))) %>%
+      .$Abundance %>%
+      summary() %>%
+      lapply(. %>% prettyNum(digits = 3)),
+  s.top3 =
+    genome_rltabd %>%
+      filter(get("Group") %in% c("Sw", "Ss")) %>%
+      group_by(Sample = get("Sample"), Class = taxon.split(get("Taxonomy"), 3)) %>%
+      summarize(Abundance = sum(get("Relative_abundance"))) %>%
+      group_by(Sample = get("Sample")) %>%
+      mutate(Rank = rank(-get("Abundance"))) %>%
+      filter(get("Rank") <= 3) %>%
+      .$Class %>%
+      table() %>%
+      .[. > 0] %>%
+      .[order(-.)] %>%
+      head(3),
+  s.bw.gammaprot.rate =
+    genome_rltabd %>%
+      filter(get("Group") %in% c("Sw", "Ss", "Bw")) %>%
+      filter(
+        grepl(
+          paste("Gammaproteobacteria", sep = "|"),
+          get("Taxonomy")
+        )
+      ) %>%
+      group_by(Sample = get("Sample"), Group = get("Group")) %>%
+      summarise(Abundance = sum(get("Relative_abundance"))) %>%
+      group_by(Group = get("Group") == "Bw") %>%
+      summarise(Mean = mean(get("Abundance"))) %>%
+      column_to_rownames("Group") %>%
+      {
+        .["FALSE", "Mean"] / .["TRUE", "Mean"]
+      }
+)
+```
+
+- The community composition of the prokaryotes in seawater and sediments were completely distinct in the bottom of the CD (Fig. 1, Supplemental Fig. S2).
+  For bottom seawater, Gammaproteobacteria, Alphaproteobacteria, Actinomycetia, and Bacteroidota were dominated
+  accounting for more than `r v$bw.dom$Min.`% of the total,
+  in which Gammaproteobacteria was the most abundant class-level clade
+  with `r v$bw.gammaprot$Min.`-`r v$bw.gammaprot$Max.`% in all seven bottom seawater samples.
+  However, the dominant taxa in class level of the bottom sediments are clearly more diverse and in significantly different proportions than those in bottom seawater.
+  Although the Gammaproteobacteria is still among the dominant clade,
+  its proportion is significant lower with less than `r v$s.gammaprot$Max.`% in the communities of all bottom sediments (Fig. 1C, Supplemental Fig. S2, Supplemental Table S2).
+  In contrast, Nitrososphaeria, Marinisomatota, Gemmatimonadota, Planctomycetota (Phycisphaerae and others), Chloroflexota (Dehalococcoidia and others)
+  account for a unignorable proportion (up to ~ `r v$s.dom$Max.`%),
+  of which the proportions are quite low among all samples in the bottom seawater
+  which are less than `r v$bw.s.dom$Max.`%.
