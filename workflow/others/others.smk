@@ -1,7 +1,7 @@
 """
  * @Date: 2022-06-28 20:33:42
  * @LastEditors: Hwrn hwrn.aou@sjtu.edu.cn
- * @LastEditTime: 2023-09-13 20:27:50
+ * @LastEditTime: 2023-09-13 21:42:21
  * @FilePath: /2021_09-MT10kSW/workflow/others/others.smk
  * @Description:
 """
@@ -103,6 +103,28 @@ rule draw_supp_fig2:
         Rscript workflow/others/draw_supp_fig2.r \
             {input.genome_abds} \
             {output.fig_coverm_relabd_signif_N}
+        """
+
+
+rule draw_supp_fig3:
+    input:
+        genome_abds=genome_abds,
+        Stdb=Stdb,
+        Wtdb=Wtdb,
+        otu=file_path.otus("otu.tsv"),
+        r="workflow/others/draw_supp_fig3.r",
+    output:
+        fig_share_water_sed=file_path.figs("supp.fig3_share_water_sed.svg"),
+    shell:
+        """
+            set +u
+            source workflow/utils/.conda_init
+            conda activate R4.1
+
+        Rscript {input.r} \
+            {input.genome_abds} \
+            {input.otu} \
+            {output.fig_share_water_sed}
         """
 
 

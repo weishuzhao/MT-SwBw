@@ -1,8 +1,8 @@
 ###
 #' @Date: 2023-09-12 23:12:57
 #' @LastEditors: Hwrn hwrn.aou@sjtu.edu.cn
-#' @LastEditTime: 2023-09-13 21:29:25
-#' @FilePath: /2021_09-MT10kSW/workflow/others/draw_supp_fig_1_2.r
+#' @LastEditTime: 2023-09-13 21:43:56
+#' @FilePath: /2021_09-MT10kSW/workflow/others/draw_supp_fig3.r
 #' @Description:
 ###
 source("workflow/utils/RLib.local/R/init.r", chdir = TRUE)
@@ -15,7 +15,7 @@ source("workflow/utils/RLib.local/R/init.r", chdir = TRUE)
 wtdb_abd <- argv[1]
 #' wtdb_abd = stringr::str_glue("Wtdb.relative_abundance.tsv") %>% file_path$file_path$results() %>% as.character # nolint
 otu_count_file <- argv[2]
-#' otu_count_file <- "results/reads_diversity/level-7.csv"
+#' otu_count_file <- "results/reads_diversity/otu.tsv"
 fig_out <- argv[3]
 
 ##### GLOBAL CONST vars                                                    #####
@@ -64,7 +64,7 @@ sample_meta_cross <-
   mutate(Group = as.character(get("Group")))
 
 otu_count <-
-  "results/reads_diversity/otu.tsv" %>%
+  otu_count_file %>%
   {
     df <- read.csv(., sep = "\t")
     colnames(df) <-
@@ -166,10 +166,10 @@ p2 <-
     )
   )
 
-
-p1 + p2 +
-  plot_layout(design = "A\nB", guides = "collect") &
-  scale_fill_manual(values = share_col)
+p2_x <-
+  p1 + p2 + guide_area() +
+    plot_layout(design = "AAA\nBBC", guides = "collect") &
+    scale_fill_manual(values = share_col)
 
 ##### OUTPUT                                                               #####
 ggsave(filename = fig_out, plot = p2_x, width = 6, height = 8)
