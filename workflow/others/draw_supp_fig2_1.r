@@ -1,7 +1,7 @@
 ###
 #' @Date: 2022-07-20 13:43:25
 #' @LastEditors: Hwrn hwrn.aou@sjtu.edu.cn
-#' @LastEditTime: 2023-09-08 17:40:26
+#' @LastEditTime: 2023-09-13 20:38:22
 #' @FilePath: /2021_09-MT10kSW/workflow/others/draw_supp_fig2_1.r
 #' @Description:
 ###
@@ -14,6 +14,7 @@ source("workflow/utils/RLib.local/R/init.r", chdir = TRUE)
 ##### INPUT: file_path, fig_out_path, keyword_args                         #####
 wtdb_abd <- argv[1]
 # wtdb_abd = stringr::str_glue("Wtdb.relative_abundance.tsv") %>% file_path$file_path$results() %>% as.character
+fig_out <- argv[2]
 
 ##### GLOBAL CONST vars                                                    #####
 font_size_1 <- 13
@@ -25,7 +26,7 @@ axis_ticks_length <- 0.1
 genome_taxonomy <- load__genome_taxonomy(load__Stdb(), load__Wtdb())
 genome_rltabd <- get_relative_abundance(wtdb_abd, genome_taxonomy)
 sample_meta_cross <-
-  read.csv("results/reads_diversity/metadata.tsv", sep = "\t") %>%
+  read.csv("results/reads_diversity/metadata.tsv", sep = "\t", as.is = TRUE) %>%
   mutate(
     X = get("Sample"),
     Layer = ifelse(
@@ -35,22 +36,37 @@ sample_meta_cross <-
   ) %>%
   merge(unique(sample_meta[c("Location", "Group")])) %>%
   mutate(Group = factor(get("Group"), names(sample_meta_col))) %>%
-  .[order(.$Group, .$Sample), ]
+  .[order(.$Group, .$Sample), ] %>%
+  mutate(Group = as.character(get("Group")))
 
 otu_count <-
-  "results/reads_diversity/level-7.csv" %>%
+  "results/reads_diversity/otu.tsv" %>%
   {
-    df <- read.csv(.)
+    df <- read.csv(., sep = "\t")
     colnames(df) <-
-      c("X", read.csv(., header = FALSE)[1, -1])
+      c("SpeciesID", read.csv(., sep = "\t", header = FALSE)[1, -1])
     df
   } %>%
-  dplyr::select(
-    -c("Layers", "Depth", "Latitude", "Longitude", "Location", "Group")
+  pivot_longer(
+    !c("SpeciesID"),
+    names_to = "X",
+    values_to = "ReadsCount"
   ) %>%
-  pivot_longer(!c("X"), names_to = "Taxonomy", values_to = "ReadsCount") %>%
-  merge(sample_meta_cross) %>%
-  filter(get("ReadsCount") > 0)
+  filter(get("ReadsCount") > 0) %>%
+  merge(
+    "results/reads_diversity/classification.tsv" %>%
+      read.csv(sep = "\t") %>%
+      mutate(
+        Taxonomy = paste(
+          get("Domain"), get("Phylum"), get("Class"),
+          get("Order"), get("Family"), get("Genus"),
+          get("SpeciesID"),
+          sep = ";"
+        )
+      ) %>%
+      dplyr::select(c("SpeciesID", "Taxonomy"))
+  ) %>%
+  merge(sample_meta_cross)
 
 otu_rltabd <-
   otu_count %>%
@@ -90,13 +106,16 @@ p_nmds_s <-
             p <-
               plot.beta.div(div_otu,
                 pname = "relative abundance",
-                method = "nmds", dist = dist, area = "polygon"
+                method = "nmds", dist = dist, area = "polygon",
+                draw_labels = FALSE
               ) +
               scale_color_manual(values = sample_meta_col) +
               scale_fill_manual(values = sample_meta_col)
             p$labels$title <-
               p$labels$title %>%
-              gsub("^[^\n]+\n(.+) (p\\(Pr\\(>F\\)\\)[^\n]+)\n.+$", "\\1\n\\2", .)
+              gsub(
+                "^[^\n]+\n(.+) (p\\(Pr\\(>F\\)\\)[^\n]+)\n.+$", "\\1\n\\2", .
+              )
             p
           })
       })
@@ -143,53 +162,4 @@ p <- NULL %>%
   }
 
 ggsave("results/figs/figs2_relative_nmds_all.svg", p, width = 14, height = 18)
-
-### ######################################################################## ###
-#### Plot figures and OUTPUT                                                ####
-### ######################################################################## ###
-##### Plot figures                                                         #####
-cross_rltabd <-
-  read.csv("results/reads_diversity/abundance.csv") %>%
-  merge(sample_meta_cross[c("X", "Sample")]) %>%
-  mutate(X = NULL) %>%
-  column_to_rownames("Sample")
-
-p2 <-
-  #' otu_rltabd %>%
-  #' mutate(Taxa_label = taxon.split(get("Taxonomy"), 1, 3)) %>%
-  cross_rltabd %>%
-  rownames_to_column("Sample") %>%
-  pivot_longer(
-    !c("Sample"),
-    names_to = "Taxa_label", values_to = "Abundance"
-  ) %>%
-  merge(sample_meta_cross) %>%
-  filter(get("Type") == "16S") %>%
-  as.data.frame() %>%
-  get_percent_plot(
-    "Abundance",
-    fill.name = "Taxa_label",
-    sample.name = "Layer",
-    labs.x = "16S sample", labs.y = "relative abundance",
-    TOP_N_TAXON_PER_LAYER = 10,
-    font_size_1 = font_size_1, font_size_2 = font_size_2,
-    font_size_3 = font_size_3, axis.ticks.length = axis_ticks_length
-  )
-# p2$data[c("Group", "Site", "Layer", "Sample", "Abundance", "name", "Genome", "Taxonomy")] %>% write.csv("results/figs/fig2_relative_nmds_class.C.csv", row.names = FALSE, quote = FALSE)
-p2_x <- p2 +
-  scale_x_discrete(
-    limits = filter(sample_meta_cross, get("Type") == "16S")$Layer
-  ) +
-  theme(
-    axis.text.x = element_text(
-      color = sample_meta_col[
-        filter(sample_meta_cross, get("Type") == "16S")$Group
-      ]
-    )
-  )
-
-##### OUTPUT                                                               #####
-ggsave(
-  filename = "results/figs/figs2_class_16s.svg",
-  plot = p2_x, width = 6, height = 7
-)
+# ggsave(fig_out, p, width = 14, height = 18)

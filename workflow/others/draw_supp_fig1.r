@@ -1,7 +1,7 @@
 ###
 #' @Date: 2022-07-20 13:43:25
 #' @LastEditors: Hwrn hwrn.aou@sjtu.edu.cn
-#' @LastEditTime: 2023-09-12 21:33:21
+#' @LastEditTime: 2023-09-13 20:32:00
 #' @FilePath: /2021_09-MT10kSW/workflow/others/draw_supp_fig1.r
 #' @Description:
 ###
@@ -13,7 +13,7 @@ source("workflow/utils/RLib.local/R/init.r", chdir = TRUE)
 ### ######################################################################## ###
 ##### INPUT: file_path, fig_out_path, keyword_args                         #####
 otu_class_abd <- argv[1]
-#' otu_class_abd <- "results/reads_diversity/abundance.csv"
+#' otu_class_abd <- "results/reads_diversity/cross_abundance.csv"
 fig_out <- argv[2]
 
 ##### GLOBAL CONST vars                                                    #####
@@ -24,7 +24,7 @@ axis_ticks_length <- 0.1
 
 ##### LOAD data AND transform TO basic format                              #####
 sample_meta_cross <-
-  read.csv("results/reads_diversity/metadata.tsv", sep = "\t") %>%
+  read.csv("results/reads_diversity/metadata.tsv", sep = "\t", as.is = TRUE) %>%
   mutate(
     X = get("Sample"),
     Layer = ifelse(
@@ -34,7 +34,8 @@ sample_meta_cross <-
   ) %>%
   merge(unique(sample_meta[c("Location", "Group")])) %>%
   mutate(Group = factor(get("Group"), names(sample_meta_col))) %>%
-  .[order(.$Group, .$Sample), ]
+  .[order(.$Group, .$Sample), ] %>%
+  mutate(Group = as.character(get("Group")))
 
 cross_rltabd <-
   otu_class_abd %>%
@@ -79,6 +80,7 @@ p2_x <- p2 +
   scale_x_discrete(
     limits = filter(sample_meta_cross, get("Type") == "16S")$Layer
   ) +
+  guides(fill = guide_legend(title = "Class", ncol = 3, reverse = TRUE)) +
   theme(
     axis.text.x = element_text(
       color = sample_meta_col[
@@ -88,4 +90,4 @@ p2_x <- p2 +
   )
 
 ##### OUTPUT                                                               #####
-ggsave(filename = fig_out, plot = p2_x, width = 6, height = 7)
+ggsave(filename = fig_out, plot = p2_x, width = 9, height = 4)

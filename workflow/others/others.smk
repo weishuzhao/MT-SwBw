@@ -1,7 +1,7 @@
 """
  * @Date: 2022-06-28 20:33:42
  * @LastEditors: Hwrn hwrn.aou@sjtu.edu.cn
- * @LastEditTime: 2023-09-12 21:31:19
+ * @LastEditTime: 2023-09-13 20:27:50
  * @FilePath: /2021_09-MT10kSW/workflow/others/others.smk
  * @Description:
 """
@@ -71,7 +71,7 @@ rule draw_fig4:
 
 rule draw_supp_fig1:
     input:
-        div_raw=file_path.otus("level-7.csv"),
+        div_raw=file_path.otus("abundance.csv"),
         r="workflow/others/draw_supp_fig1.r",
     output:
         fig_class_16s=file_path.figs("supp.fig1_class_16s"),
@@ -82,7 +82,7 @@ rule draw_supp_fig1:
             conda activate R4.1
 
         Rscript {input.r} \
-            {input.div_raw}
+            {input.div_raw} \
             {output.fig_class_16s}
         """
 
