@@ -1,7 +1,7 @@
 """
  * @Date: 2022-06-28 20:33:42
  * @LastEditors: Hwrn hwrn.aou@sjtu.edu.cn
- * @LastEditTime: 2023-09-07 21:47:22
+ * @LastEditTime: 2023-09-12 21:31:19
  * @FilePath: /2021_09-MT10kSW/workflow/others/others.smk
  * @Description:
 """
@@ -71,19 +71,19 @@ rule draw_fig4:
 
 rule draw_supp_fig1:
     input:
-        div_raw=file_path.otus("phyloFlash_raw"),
+        div_raw=file_path.otus("level-7.csv"),
+        r="workflow/others/draw_supp_fig1.r",
     output:
-        fig_phylpflash_unannot=file_path.figs("supp.fig1_phylpflash_unannot"),
-    message:
-        "show mOTU annotated level and rarefy it"
+        fig_class_16s=file_path.figs("supp.fig1_class_16s"),
     shell:
         """
             set +u
             source workflow/utils/.conda_init
             conda activate R4.1
 
-        Rscript workflow/others/draw_supp_fig1.r \
-            {output.fig_phylpflash_unannot}
+        Rscript {input.r} \
+            {input.div_raw}
+            {output.fig_class_16s}
         """
 
 

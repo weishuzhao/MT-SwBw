@@ -1,11 +1,9 @@
 ###
-#' @Date: 2022-03-23 00:39:47
-#' @LastEditors: Hwrn
-#' @LastEditTime: 2022-08-09 09:07:10
+#' @Date: 2022-07-20 13:43:25
+#' @LastEditors: Hwrn hwrn.aou@sjtu.edu.cn
+#' @LastEditTime: 2023-09-12 21:33:21
 #' @FilePath: /2021_09-MT10kSW/workflow/others/draw_supp_fig1.r
-#' @FromFilePath: /2021_09-MT10kSW/workflow/reads_diversity/rarefy_phyloFlash.r
 #' @Description:
-#'  Fig. S1. Annotation percentage of mOTU of metagenomes of seawater and sediment samples used in this study.
 ###
 source("workflow/utils/RLib.local/R/init.r", chdir = TRUE)
 
@@ -13,23 +11,37 @@ source("workflow/utils/RLib.local/R/init.r", chdir = TRUE)
 ### ######################################################################## ###
 #### Preprocessing                                                          ####
 ### ######################################################################## ###
-##### INPUT: file_path, keyword_args, fig_out_path                         #####
-fig_out = argv[1]
+##### INPUT: file_path, fig_out_path, keyword_args                         #####
+otu_class_abd <- argv[1]
+#' otu_class_abd <- "results/reads_diversity/abundance.csv"
+fig_out <- argv[2]
 
 ##### GLOBAL CONST vars                                                    #####
+font_size_1 <- 13
+font_size_2 <- 10
+font_size_3 <- 10
+axis_ticks_length <- 0.1
 
 ##### LOAD data AND transform TO basic format                              #####
-div.phyloflash.raw =
-  file_path$file_path$otus("phyloFlash_raw") %>% as.character %>%
-  read.csv() %>%
-  {
-    .$Site = gsub(
-      "^.+phyloFlash\\.\\.(.+)\\.\\.(.+)\\.csv$", "\\1..\\2", .$File
-    )
-    .
-  } %>%
-  reshape2::acast(formula("OTU ~ Site"), value.var = "Reads", fill = 0)
+sample_meta_cross <-
+  read.csv("results/reads_diversity/metadata.tsv", sep = "\t") %>%
+  mutate(
+    X = get("Sample"),
+    Layer = ifelse(
+      get("Type") == "16s", get("Sample"), gsub("^[^_]+_", "", get("Sample"))
+    ),
+    Sample = paste0(get("Group"), "_", get("Layer"))
+  ) %>%
+  merge(unique(sample_meta[c("Location", "Group")])) %>%
+  mutate(Group = factor(get("Group"), names(sample_meta_col))) %>%
+  .[order(.$Group, .$Sample), ]
 
+cross_rltabd <-
+  otu_class_abd %>%
+  read.csv() %>%
+  merge(sample_meta_cross[c("X", "Sample")]) %>%
+  mutate(X = NULL) %>%
+  column_to_rownames("Sample")
 
 ### ######################################################################## ###
 #### Define function AND Calculate data                                     ####
@@ -37,82 +49,43 @@ div.phyloflash.raw =
 ##### Define function                                                      #####
 
 ##### Calculate data                                                       #####
-div.lastannot = sapply(
-  as.character(taxon.levels),
-  function(x)
-    apply(div.phyloflash.raw[!taxon.split(rownames(div.phyloflash.raw), x) %>%
-                               grepl(pattern = "^\\([^;]+\\)$", .),],  # > 0,#,
-          2, sum))
-
-div.lastannot.min = div.lastannot %>%
-  (function(x) x / x[, 1] * 100)(.) %>%
-  {
-    Layer = rownames(.)
-    data.frame(Min = apply(., 2, min),
-               Layer = apply(., 2, . %>% {Layer[which.min(.)]}),
-               Taxon = factor(colnames(.), levels = taxon.levels))
-  } %>%
-  {
-    .$Taxon.last =
-      .$Taxon %>% as.character %>% {c(NA, .)[1:length(.)]} %>%
-      factor(levels = taxon.levels)
-    .
-  }
-
-div.raw =
-  div.lastannot %>%
-  apply(., 1, function(x) x - c(x[-1], 0)) %>%
-  reshape2::melt(varnames = c("Annotated level", "Layer"), value.name = "Reads",
-                 as.is = TRUE) %>%
-  as.data.frame() %>%
-  {
-    .[, "Annotated level"] = factor(.[, "Annotated level"],
-                                  levels = rev(taxon.levels))
-    .
-  } %>%
-  {.$Group = layer_2_group(.$Layer); .} %>%
-  {.$Sample = paste0(.$Group, "_", .$Layer); .}
-
-paletteer::paletteer_dynamic("cartography::pastel.pal", 20) %>%
-  {
-    pathways = taxon.levels
-    cols = c(.[1:length(pathways)])
-    names(cols) = pathways
-    cols
-  }
 
 ### ######################################################################## ###
 #### Plot figures and OUTPUT                                                ####
 ### ######################################################################## ###
-p = get_percent_plot(div.raw, "Reads", "Annotated level",
-                      labs.x = "", labs.y = "relative abundance") +
+##### Plot figures                                                         #####
+p2 <-
+  #' otu_rltabd %>%
+  #' mutate(Taxa_label = taxon.split(get("Taxonomy"), 1, 3)) %>%
+  cross_rltabd %>%
+  rownames_to_column("Sample") %>%
+  pivot_longer(
+    !c("Sample"),
+    names_to = "Taxa_label", values_to = "Abundance"
+  ) %>%
+  merge(sample_meta_cross) %>%
+  filter(get("Type") == "16S") %>%
+  as.data.frame() %>%
+  get_percent_plot(
+    "Abundance",
+    fill.name = "Taxa_label",
+    sample.name = "Layer",
+    labs.x = "16S sample", labs.y = "relative abundance",
+    TOP_N_TAXON_PER_LAYER = 10,
+    font_size_1 = font_size_1, font_size_2 = font_size_2,
+    font_size_3 = font_size_3, axis.ticks.length = axis_ticks_length
+  )
+p2_x <- p2 +
   scale_x_discrete(
-    limits =
-      sample_meta[c("Site", "Layers")] %>%
-      apply(1, . %>% paste(collapse = ".."))
+    limits = filter(sample_meta_cross, get("Type") == "16S")$Layer
   ) +
-  theme(axis.text.x = element_text(color = sample_meta_col[sample_meta$Group]))
-
-p2 =
-  p +
-  geom_hline(
-    data = div.lastannot.min[2:6,],
-    mapping = aes_string(yintercept = "Min",
-                         linetype = "Taxon",
-                         color = "Taxon"),
-    size = 0.7
-  ) +
-  scale_color_manual(
-    values =
-      paletteer::paletteer_d("ggsci::default_igv")[2:7] %>% rev %>% c %>%
-      {names(.) = taxon.levels[-1]; .}
-  ) +
-  guides(color = "none") +
-  geom_point(
-    data = div.lastannot.min[2:6,],
-    mapping = aes_string(x = "Layer", y = "Min", fill = NULL),
-    size = 5, shape = 10
+  theme(
+    axis.text.x = element_text(
+      color = sample_meta_col[
+        filter(sample_meta_cross, get("Type") == "16S")$Group
+      ]
+    )
   )
 
-
-ggsave(filename = fig_out, plot = p2, width = 8, height = 5, dpi = 300)
+##### OUTPUT                                                               #####
+ggsave(filename = fig_out, plot = p2_x, width = 6, height = 7)

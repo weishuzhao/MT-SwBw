@@ -210,7 +210,7 @@ Stdb.quality <- with(Stdb, assign_quality(Completeness, Contamination))
 ## Comparison of the prokaryotic community between seawater and sediment on the slope and bottom
 ```{r}
 sample_meta_cross <-
-  read.csv("results/reads_diversity/metadata.tsv", sep = "\t") %>%
+  read.csv("results/reads_diversity/metadata.tsv", sep = "\t", as.is = TRUE) %>%
   mutate(
     X = get("Sample"),
     Layer = ifelse(
@@ -218,7 +218,10 @@ sample_meta_cross <-
     ),
     Sample = paste0(get("Group"), "_", get("Layer"))
   ) %>%
-  merge(unique(sample_meta[c("Location", "Group")]))
+  merge(unique(sample_meta[c("Location", "Group")])) %>%
+  mutate(Group = factor(get("Group"), names(sample_meta_col))) %>%
+  .[order(.$Group, .$Sample), ] %>%
+  mutate(Group = as.character(get("Group")))
 
 otu_count <-
   "results/reads_diversity/level-7.csv" %>%
@@ -235,11 +238,31 @@ otu_count <-
   merge(sample_meta_cross) %>%
   filter(get("ReadsCount") > 0)
 
-genome_rltabd %>%
-  get_total_ce(value.name = "Relative.abundance") %>%
-  .$Total
+otu_count %>%
+  group_by(get("Sample")) %>%
+  summarise(Total = sum(get("ReadsCount")))
 
-otu_count %>% group_by(get("Sample")) %>% summarise(Total = sum(get("ReadsCount")))
+
+set.seed(589)
+genome_rltabd %>%
+  filter(get("Group") %in% c("Bw", "Sw")) %>%
+  mutate(
+    name = taxon.split(get("Taxonomy"), 1, 3),
+    Sample1 = paste0(
+      ifelse(get("Site") %in% c("TY.044", "TY.041"), "filtered", "unfiltered"),
+      "_",
+      get("Layer")
+    )
+  ) %>%
+  reshape2::acast(
+    formula = formula("name ~ Sample1"),
+    value.var = "Relative_abundance",
+    fun.aggregate = sum, fill = 0
+  ) %>%
+  plot.beta.div(
+    pname = "relative abundance",
+    method = "nmds", dist = "bray", area = "polygon"
+  )
 ```
 
 - The relative abundance of MAGs were used to describe the community structure,
@@ -285,24 +308,28 @@ otu_count %>% group_by(get("Sample")) %>% summarise(Total = sum(get("ReadsCount"
 ref_genome_info <- read.csv("04_bin/03_reference/genome_info.csv")
 venn_phylum <-
   genome_rltabd %>%
-  {
-    .$Phylum <- .$Taxonomy %>% taxon.split(1, 2)
-    .
-  } %>%
-  {
-    split(.$Phylum, .$Group)
-  } %>%
+  mutate(Phylum = get("Taxonomy") %>% taxon.split(1, 2)) %>%
+  with(split(get("Phylum"), get("Group"))) %>%
   lapply(unique)
 ```
 
-- We constructed a phylogenetic tree by using
-    `r sum(genome_prevalence_across_group[(!genome_prevalence_across_group$Ss == "") | (!genome_prevalence_across_group$Sw == ""), "Genomes"])` representative MAGs
-    (dereplicated at 95% average nucleotide identity (ANI)) at slope and
-    `r sum(genome_prevalence_across_group[(!genome_prevalence_across_group$Bs == "") | (!genome_prevalence_across_group$Bw == ""), "Genomes"])` representative MAGs at bottom
-    together with `r dim(ref_genome_info)[1]` reference genomes from the GTDB [13] (Methods, Fig. 3).
+- We further constructed a phylogenetic tree by using
+    `r sum(genome_prevalence_across_group[(!genome_prevalence_across_group$Ss == "") | (!genome_prevalence_across_group$Sw == ""), "Genomes"])` MAGs
+      detected in the slope and
+    `r sum(genome_prevalence_across_group[(!genome_prevalence_across_group$Bs == "") | (!genome_prevalence_across_group$Bw == ""), "Genomes"])` in the bottom samples,
+  together with `r dim(ref_genome_info)[1]` reference genomes from the GTDB [13] (Methods, Fig. 3).
 - These MAGs were distributed into
-    `r length(unique(c(venn_phylum$Ss, venn_phylum$Sw)))` phyla in samples at slope while
-    `r length(unique(c(venn_phylum$Bs, venn_phylum$Bw)))` phyla in samples at bottom.
+    `r length(unique(c(venn_phylum$Ss, venn_phylum$Sw)))` phyla in the slope samples and
+    `r length(unique(c(venn_phylum$Bs, venn_phylum$Bw)))` phyla in the bottom samples
+      (Supplemental Fig. S2, Supplemental Fig. S3).
+  The class-level clades across the seawater and sediment at the slope 
+    were obviously more numerous and more widely distributed
+      than those at the bottom of the CD
+        (Fig. 3, Supplemental Fig. S3).
+  A detailed comparison of the microbial communities 
+    in the seawater and sediment samples 
+      from the bottom and the southern slope 
+    will be described in the following section.
 
 ```{r}
 freq.phylum <-

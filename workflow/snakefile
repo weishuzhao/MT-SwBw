@@ -1,7 +1,7 @@
 """
  * @Date: 2022-05-28 23:04:47
  * @LastEditors: Hwrn hwrn.aou@sjtu.edu.cn
- * @LastEditTime: 2023-09-07 11:47:22
+ * @LastEditTime: 2023-09-12 21:34:02
  * @FilePath: /2021_09-MT10kSW/workflow/snakefile
  * @Description:
 """
@@ -15,7 +15,7 @@ SLURM_ARRAY_TASK_ID = snake_config.SLURM_ARRAY_TASK_ID
 rule all:
     input:
         # support figure
-        fig_phylpflash_unannot=file_path.figs("supp.fig1_phylpflash_unannot"),
+        fig_class_16s=file_path.figs("supp.fig1_class_16s"),
         fig_coverm_relabd_signif_N=file_path.figs("supp.fig2_coverm_relabd_signif_N"),
         fig_mag_venn=file_path.figs("supp.fig3_mag_venn"),
         fig_ko_tpm_signif_site=file_path.figs("supp.fig4_ko_tpm_signif_site"),
