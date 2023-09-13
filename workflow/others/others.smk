@@ -1,7 +1,7 @@
 """
  * @Date: 2022-06-28 20:33:42
  * @LastEditors: Hwrn hwrn.aou@sjtu.edu.cn
- * @LastEditTime: 2023-09-13 21:42:21
+ * @LastEditTime: 2023-09-13 22:14:37
  * @FilePath: /2021_09-MT10kSW/workflow/others/others.smk
  * @Description:
 """
@@ -87,34 +87,35 @@ rule draw_supp_fig1:
         """
 
 
-rule draw_supp_fig2:
+rule draw_supp_fig3:
     input:
         genome_abds=genome_abds,
         Stdb=Stdb,
         Wtdb=Wtdb,
+        r="workflow/others/draw_supp_fig3.r",
     output:
-        fig_coverm_relabd_signif_N=file_path.figs("supp.fig2_coverm_relabd_signif_N"),
+        fig_coverm_relabd_signif_N=file_path.figs("supp.fig3_coverm_relabd_signif_N"),
     shell:
         """
             set +u
             source workflow/utils/.conda_init
             conda activate R4.1
 
-        Rscript workflow/others/draw_supp_fig2.r \
+        Rscript {input.r} \
             {input.genome_abds} \
             {output.fig_coverm_relabd_signif_N}
         """
 
 
-rule draw_supp_fig3:
+rule draw_supp_fig2:
     input:
         genome_abds=genome_abds,
         Stdb=Stdb,
         Wtdb=Wtdb,
         otu=file_path.otus("otu.tsv"),
-        r="workflow/others/draw_supp_fig3.r",
+        r="workflow/others/draw_supp_fig2.r",
     output:
-        fig_share_water_sed=file_path.figs("supp.fig3_share_water_sed.svg"),
+        fig_share_water_sed=file_path.figs("supp.fig2_share_water_sed"),
     shell:
         """
             set +u
