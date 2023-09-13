@@ -1,7 +1,7 @@
 ###
 #' @Date: 2023-09-12 23:12:57
 #' @LastEditors: Hwrn hwrn.aou@sjtu.edu.cn
-#' @LastEditTime: 2023-09-12 23:20:19
+#' @LastEditTime: 2023-09-13 21:29:25
 #' @FilePath: /2021_09-MT10kSW/workflow/others/draw_supp_fig_1_2.r
 #' @Description:
 ###
@@ -47,10 +47,10 @@ axis_ticks_length <- 0.1
 
 ##### LOAD data AND transform TO basic format                              #####
 genome_taxonomy <- load__genome_taxonomy(load__Stdb(), load__Wtdb())
-genome_rltabd <- get_relative_abundance(Wtdb_abd, genome_taxonomy)
+genome_rltabd <- get_relative_abundance(wtdb_abd, genome_taxonomy)
 
 sample_meta_cross <-
-  read.csv("results/reads_diversity/metadata.tsv", sep = "\t") %>%
+  read.csv("results/reads_diversity/metadata.tsv", sep = "\t", as.is = TRUE) %>%
   mutate(
     X = get("Sample"),
     Layer = ifelse(
@@ -64,19 +64,33 @@ sample_meta_cross <-
   mutate(Group = as.character(get("Group")))
 
 otu_count <-
-  otu_count_file %>%
+  "results/reads_diversity/otu.tsv" %>%
   {
-    df <- read.csv(.)
+    df <- read.csv(., sep = "\t")
     colnames(df) <-
-      c("X", read.csv(., header = FALSE)[1, -1])
+      c("SpeciesID", read.csv(., sep = "\t", header = FALSE)[1, -1])
     df
   } %>%
-  dplyr::select(
-    -c("Layers", "Depth", "Latitude", "Longitude", "Location", "Group")
+  pivot_longer(
+    !c("SpeciesID"),
+    names_to = "X",
+    values_to = "ReadsCount"
   ) %>%
-  pivot_longer(!c("X"), names_to = "Taxonomy", values_to = "ReadsCount") %>%
-  merge(sample_meta_cross) %>%
-  filter(get("ReadsCount") > 0)
+  filter(get("ReadsCount") > 0) %>%
+  merge(
+    "results/reads_diversity/classification.tsv" %>%
+      read.csv(sep = "\t") %>%
+      mutate(
+        Taxonomy = paste(
+          get("Domain"), get("Phylum"), get("Class"),
+          get("Order"), get("Family"), get("Genus"),
+          get("SpeciesID"),
+          sep = ";"
+        )
+      ) %>%
+      dplyr::select(c("SpeciesID", "Taxonomy"))
+  ) %>%
+  merge(sample_meta_cross)
 
 ### ######################################################################## ###
 #### Define function AND Calculate data                                     ####
@@ -105,7 +119,6 @@ otu_rltabd <-
 
 p1 <-
   genome_rltabd %>%
-  filter(get("Relative_abundance") > 0.01) %>%
   group_by(Genome = get("Genome")) %>%
   mutate(Group1 = assign_share(get("Group"))) %>%
   group_by(
@@ -122,37 +135,13 @@ p1 <-
   ) +
   scale_x_discrete(
     limits =
-      sample_meta[c("Site", "Layers")] %>%
-      apply(1, . %>% paste(collapse = ".."))
+      sample_meta[c("Site", "Layers")] %>% # nolint
+        apply(1, . %>% paste(collapse = "..")) # nolint
   ) +
   theme(axis.text.x = element_text(color = sample_meta_col[sample_meta$Group]))
 p2 <-
-  genome_rltabd %>%
-  filter(get("Relative_abundance") > 0.01) %>%
-  group_by(Genus = taxon.split(get("Taxonomy"), 1, 6)) %>%
-  mutate(Group1 = assign_share(get("Group"))) %>%
-  group_by(
-    Group1 = get("Group1"),
-    Site = get("Site"), Layer = get("Layer"),
-    Sample = get("Sample"), Group = get("Group")
-  ) %>%
-  summarise(Abundance = sum(get("Relative_abundance"))) %>%
-  as.data.frame() %>%
-  get_percent_plot(
-    "Abundance",
-    fill.name = "Group1", sample.name = "Layer",
-    labs.y = "MAG genus prevalence"
-  ) +
-  scale_x_discrete(
-    limits =
-      sample_meta[c("Site", "Layers")] %>%
-      apply(1, . %>% paste(collapse = ".."))
-  ) +
-  theme(axis.text.x = element_text(color = sample_meta_col[sample_meta$Group]))
-
-p3 <- otu_rltabd %>%
-  filter(get("Abundance") > 0.01) %>%
-  group_by(Genus = taxon.split(get("Taxonomy"), 1, 6)) %>%
+  otu_rltabd %>%
+  group_by(SpeciesID = get("SpeciesID")) %>%
   mutate(Group1 = assign_share(get("Group"))) %>%
   group_by(
     Group1 = get("Group1"),
@@ -164,7 +153,7 @@ p3 <- otu_rltabd %>%
   get_percent_plot(
     "Abundance",
     fill.name = "Group1", sample.name = "Layer",
-    labs.y = "16S genus prevalence"
+    labs.y = "16S ASV prevalence"
   ) +
   scale_x_discrete(
     limits = filter(sample_meta_cross, get("Type") == "16S")$Layer
@@ -178,9 +167,9 @@ p3 <- otu_rltabd %>%
   )
 
 
-p1 + p2 + p3 +
-  plot_layout(design = "A\nB\nC", guides = "collect") &
+p1 + p2 +
+  plot_layout(design = "A\nB", guides = "collect") &
   scale_fill_manual(values = share_col)
 
 ##### OUTPUT                                                               #####
-ggsave(filename = fig_out, plot = p2_x, width = 6, height = 10)
+ggsave(filename = fig_out, plot = p2_x, width = 6, height = 8)
