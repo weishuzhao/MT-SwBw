@@ -1,0 +1,198 @@
+---
+Date: 2023-09-13 12:05:31
+LastEditors: Hwrn hwrn.aou@sjtu.edu.cn
+LastEditTime: 2023-09-14 20:40:30
+FilePath: /2021_09-MT10kSW/results/Rmd/check_results.2.Rmd
+Description:
+output:
+  html_document:
+    df_print: paged
+    theme: cerulean
+    highlight: haddock
+    toc: yes
+    toc_depth: 3
+    toc_float:
+      collapsed: no
+      smooth_scroll: yes
+    code_fold: hide
+---
+Results 2: Comparison of metabolic capabilities in nitrogen cycling between the seawater and sediment on the slope and bottom
+===
+
+## Data Import and prepare
+
+```{r setup, include=FALSE}
+knitr::opts_knit$set(root.dir = "~/Work/2021_09-MT10kSW/")
+```
+
+```{r config, message=FALSE, warning=FALSE}
+source("workflow/utils/RLib.local/R/init.r", chdir = TRUE)
+```
+
+```{r load_data, cache=TRUE, dependson=c("config")}
+Wtdb_abd <- # nolint
+  stringr::str_glue("Wtdb.relative_abundance.tsv") %>%
+  file_path$file_path$results() %>%
+  as.character()
+
+Stdb <- load__Stdb() # nolint
+Wtdb <- load__Wtdb() # nolint
+genome_taxonomy <- load__genome_taxonomy(load__Stdb(), load__Wtdb())
+genome_rltabd <- get_relative_abundance(Wtdb_abd, genome_taxonomy)
+
+taxon_color <- load__taxon_color()
+
+TOTAL_TAXA_NUM <- # nolint
+  genome_rltabd %>%
+  {
+    sapply(taxon.split(.$Taxonomy, 1, 7), get_taxon_color)
+  } %>%
+  unique() %>%
+  length() %>%
+  {
+    . * 2
+  }
+
+key_genes <- load__key_genes()
+key_genes_N <- # nolint
+  key_genes %>%
+  .[.$Pathway == "N", ] %>%
+  {
+    .$Pathway <- .$Arrow %>% factor(levels = unique(.))
+    .
+  }
+TOTAL_GENE_NUM <- key_genes$KO %>% # nolint
+  length() %>%
+  {
+    . * 2
+  }
+
+gene_ko_tpm_N <- # nolint
+  load__gene_ko_tpm() %>%
+  .[.$KO %in% key_genes_N$KO, ]
+genomeko_N <- # nolint
+  load__genomeko() %>%
+  .[
+    rownames(.) %>% .[. %in% key_genes_N$KO],
+  ] %>%
+  .[apply(., 1, sum) > 0, apply(., 2, sum) > 0]
+```
+
+## Results 2 Comparison of metabolic capabilities in nitrogen cycling between the seawater and sediment on the slope and bottom
+- We further focused on the abundance of key metabolic genes from these MAGs
+    (Fig. 4, Supplemental Fig. S3, Supplemental Fig. S5).
+- In general, key genes that were related to the nitrogen cycle
+    were found to be widespread in the MAGs
+      in all the measured seawater and sediment samples in this study;
+  therefore, we
+    used these key genes to indicate the various pathways related to the nitrogen cycle
+    and highlighted the corresponding taxa using the key genes in the MAGs
+      (Fig. 4A, Supplemental Fig. S5, Supplemental Table S3).
+- For the redox processes among major nitrogen species,
+  the pathways of
+    dissimilatory nitrate reduction to ammonia (napA/nasA/narB and nirA/nirB/nrfA)
+    and denitrification (nirK, norB and nosZ)
+  were relatively widely distributed within various class-level clades,
+  covering both
+    the above-mentioned abundant groups (e.g., Gammaproteobacteria, Alphaproteobacteria, Marinisomatia, Gemmatimonadetes, Planctomycetes, Dehalococcoidia)
+    and specific minority groups (e.g., Nitrospiria).
+- The representative gene
+    of
+      the cleavage system from organic nitrogen to ammonium (gcvT, GLUD1_2, gdhA, and npd),
+      the nitrogen transfer between amino acids and ammonia (glnA),
+      and the ammonium transporter gene amt
+    also had the widest distribution
+    among all tested class-level clades,
+  which indicates the potential importance of recycling and exchanging nitrogen sources
+    between cells and inorganic ammonium
+    in both the seawater and sediment on both the bottom and slope of the CD (Supplemental Fig. S5).
+- Genes related to ammonia (amoABC, gcvT, GLUD1_2, gdhA, and npd)
+    were very abundant in all environments (Supplemental Fig. S6, Supplemental Fig. S7).
+- In contrast, some processes were constrained within certain groups,
+  such as
+    ammonia oxidation (amoABC) in Nitrososphaeria (ammonia-oxidizing archaea class, formerly named Thaumarchaeota) (7,25)
+    and nitrogen fixation (nifH, nifD, and nifK) in Gammaproteobacteria and Alphaproteobacteria (Supplemental Fig. S5).
+- A comparison of the four groups of samples,
+  including slope seawater (Sw), slope sediment (Ss), bottom seawater (Bw) and bottom sediment (Bs),
+    in terms of the relative abundance of nitrogen-related genes
+    revealed that
+      different nitrogen cycle processes may exist between the seawater and sediment on the slope and at the bottom.
+
+### Bottom: higher nitrate reduction to ammonia
+- - The abundance of many key nitrogen metabolic genes
+      was significantly different between the water and sediment at the bottom of the trench.
+  - For example,
+    genes in nitrate reduction pathway
+      were obtained to be more abundant in both Bs and Bw samples,
+    but they may from different gene families and microbial classes (Fig. 4B, Fig. 5).
+  - The highest abundance of assimilatory nitrate reduction genes (nasAB)
+      was detected in the Bs samples compared to other three groups,
+      and was mostly from Gammaproteobacteria.
+  - Genes catalyzing the first step
+      of nitrate reduction and denitrification (narGHI, napAB)
+      were more abundant in both bottom samples than the slope samples.
+  - However,
+    in the sediment samples, narGHI and napAB
+      from Dehalococcoidia, Gemmatimonadetes, Phycisphaerae, Alphaproteobacteria, and Marinisomatota
+      were the most abundant,
+    while those in Bs samples
+      may have been related to genes encoded by Gammaproteobacteria genomes.
+
+- - Community in Bs and Bw also obtained abundant but different nirtite reduction gene.
+  - The community in the seawater
+      was more likely to reduce nitrite with dissimilatory enzymes (nirBD),
+    while the community in the sediment
+      was more likely to use other dissimilatory enzymes (nrfAH) and assimilatory enzymes (nirA).
+  - Most of the nirBDs annotated from the Bw were related to Gammaproteobacteria,
+      while nirD from Marinisomatia, Dehalococcoidia, Alphaproteobacteria, and Nitrospinia were dominant in the Bs.
+  - This indicated that
+      the community at the bottom of the CD
+    was likely to utilize nitrate but in different metabolic pathways,
+      as Gammaproteobacteria encoded many key genes involved in nitrate and nitrite reduction (Supplemental Fig. S6).
+  - An isolated and linked nrfAH was found in the co-occurrence pattern of the Bw and Bs samples (Supplemental Fig. S7).
+  - While no nrfH was annotated from Gammaproteobacteria or Alphaproteobacteria (Supplemental Fig. S6),
+    such a co-occurrence pattern indicated modulization of nitrite reduction.
+  - Besides,
+    the metabolic potential of ammonia oxidation (amoABC) was also high in the sediment but low in the seawater,
+    corresponding to the high abundance of Nitrospinia in the Bs samples.
+  - In addition, the metabolic potential of nitrous oxide reduction (nirKS, norBC, and nosZ) in denitrification
+      was higher at the bottom than on the slope,
+    indicating that the probability of nitrogen loss at the bottom was potentially higher than that on the slope.
+
+- - In genenral, the abundance of genes in Ss and Sw were more comarable compared to Bs and Bw samples.
+  - Genes involved in a lot of pathways were obtained a similar abundance in the Ss and Sw samples as well as Bs samples,
+    including
+      dissimilatory nitrate reduction (narGHI, napAB),
+      assimilatory and dissimilatory nitrite reduction (nrfAH, nirBD, and nirA),
+      ammonia oxidation (amoABC),
+      and nitrate import (nrtABC).
+  - In contrast, the abundance of hcp,
+      which encoded enzyme catalying decomposition of hydroxylamine into ammonia,
+      was lower in Ss, Sw, and Bw compared to Bs.
+  - We also noticed that while the total abundance of some genes were similar between Ss and Sw,
+    they may encoded by different genome.
+  - For example, the most abundance nrfA gene was encoded by Marinisomatia in Sw and Ignavibacteria from the Bacteroidota in Ss.
+  - In addition, a high abundance of nirK from Nitrososphaeria and several bacteria lineages was detected in both Ss and Sw samples,
+    while the abundance of another denitrification gene nirS was mostly encoded by Marinisomatia in Ss samples and nearly absent in Sw samples
+
+
+(put into discussion)
+- The high abundance of nitrite reduction and ammonia oxidation genes indicated a recycling of nitrogen between nitrite (utilized by bacteria) and ammonia (consumed by archaea) (Supplemental Fig. S6).
+
+### Genes involved in sulfur metabolism
+
+- For sulfur metabolism, a lot of genes involve in 
+
+## Discussion
+- Furthermore, the results here also show that the V-shaped topography of the CD in the Mariana Trench impacts the environmental conditions of the bottom and slope, which shapes the prokaryotic community, affects their metabolic potential, and further influences prokaryote-mediated elemental cycling (Fig. 4, Fig. 5).
+  - Using the nitrogen cycling processes as an example, the abundance of key enzymes for different nitrogen cycling pathways in the metagenomes **implied the distinct metabolic capacities and preferences** of the communities in the **bottom and slope** environments.
+  - At the bottom of the CD, **nitrate reduction** was **potentially stronger than that on the slope**, of which genes were observed with a distinct preference for seawater (nasAB, conducted by Gammaproteobacteria) and sediment (narGHI and napAB, mainly conducted by Dehalococcoidia).
+    - Nitrate is an electron acceptor that follows oxygen, and its reduction was reported to be enhanced under high pressure (26).
+    - Compared with the aerobic respiration, anaerobic respiration such as nitrate reduction may reduce the production of ROS, and microbials may use nitrate as electronic accepter instead under the HHP condition.
+    - The stronger potential in nitrate reduction at the bottom may be used to provide the extra energy required for organic matter degradation in conjunction with aerobic respiration in the hadal trench.
+  - In fact, a higher abundance of **organic carbon degradation genes**, such as aromatic compounds (catAE, boxB, and hcrA) and complex sugars (chi and pulA), was observed at the bottom of the CD (Supplemental Results, Supplemental Fig. S4).
+  - However, on the slope, higher recycling of **ammonia oxidation to nitrite** than at the bottom was observed, which was conducted by similar taxa using similar pathways and genes between the seawater and sediment.
+    - Ammonia could be released during the degradation of organic matter, and there may be a trophic cascade between the process of oxidative recirculation of ammonia and the degradation of organic matter (17).
+    - In addition, ammonia oxidation is also considered a major contributor to **dark carbon fixation** in the ocean, which may be involved in the reproduction of organic carbon in the CD.
+  - Therefore, the difference in nitrogen cycling processes between the bottom and the slope and between the seawater and the sediment is accompanied by carbon conversion, which is greatly important for the deeper understanding of elemental turnover in the Mariana Trench.
+  - While this study provided some metagenomic information on the abundance of key genes, more direct evidence is still needed in the future by integrating additional methodologies such as the metaproteomic approach and/or in situ measurements.

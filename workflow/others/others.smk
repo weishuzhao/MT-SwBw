@@ -1,7 +1,7 @@
 """
  * @Date: 2022-06-28 20:33:42
  * @LastEditors: Hwrn hwrn.aou@sjtu.edu.cn
- * @LastEditTime: 2023-09-13 22:14:37
+ * @LastEditTime: 2023-09-14 21:26:24
  * @FilePath: /2021_09-MT10kSW/workflow/others/others.smk
  * @Description:
 """
@@ -129,13 +129,13 @@ rule draw_supp_fig2:
         """
 
 
-rule draw_supp_fig4:
+rule draw_supp_fig5:
     input:
         genome_abds=genome_abds,
         gene_tpm=file_path.results("gene_ko_tpm.csv"),
-        r="workflow/others/draw_supp_fig4.r",
+        r="workflow/others/draw_supp_fig5.r",
     output:
-        fig_ko_tpm_signif_site=file_path.figs("supp.fig4_ko_tpm_signif_site"),
+        fig_ko_tpm_signif_site=file_path.figs("supp.fig5_ko_tpm_signif_site"),
     shadow:
         "shallow"
     conda:

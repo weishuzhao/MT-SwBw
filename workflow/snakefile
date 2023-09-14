@@ -1,7 +1,7 @@
 """
  * @Date: 2022-05-28 23:04:47
  * @LastEditors: Hwrn hwrn.aou@sjtu.edu.cn
- * @LastEditTime: 2023-09-13 22:14:52
+ * @LastEditTime: 2023-09-14 21:26:31
  * @FilePath: /2021_09-MT10kSW/workflow/snakefile
  * @Description:
 """
@@ -19,7 +19,7 @@ rule all:
         fig_share_water_sed=file_path.figs("supp.fig2_share_water_sed"),
         fig_coverm_relabd_signif_N=file_path.figs("supp.fig3_coverm_relabd_signif_N"),
         fig_mag_venn=file_path.figs("supp.fig4_mag_venn"),
-        fig_ko_tpm_signif_site=file_path.figs("supp.fig4_ko_tpm_signif_site"),
+        fig_ko_tpm_signif_site=file_path.figs("supp.fig5_ko_tpm_signif_site"),
         fig_ko_class_heatmap_N=file_path.figs("supp.fig5_ko_class_heatmap_N"),
         fig_ko_relationship_N=[
             file_path.figs(f"supp.fig6.{i}_ko_relationship_N_{domain_spec}")
