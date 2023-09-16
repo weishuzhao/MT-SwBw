@@ -1,8 +1,8 @@
 ###
 #' @Date: 2022-05-04 09:42:54
 #' @LastEditors: Hwrn hwrn.aou@sjtu.edu.cn
-#' @LastEditTime: 2023-04-23 16:41:17
-#' @FilePath: /2021_09-MT10kSW/workflow/others/draw_supp_fig4.r
+#' @LastEditTime: 2023-09-14 21:28:39
+#' @FilePath: /2021_09-MT10kSW/workflow/others/draw_supp_fig5.r
 #' @Description:
 ###
 library(ggplot2)
@@ -34,11 +34,12 @@ TOTAL_GENE_NUM <- key_genes$KO %>% # nolint: object_name_linter.
 ### ######################################################################## ###
 ##### Define function                                                      #####
 report__tpm_key_bar_group <- function(tpm_key) {
-  tpm_key.signif <-
+  tpm_key_signif <-
     tpm_key %>%
     location.group.signif("KO", "TPM", "Location", "Group", TOTAL_GENE_NUM) %>%
     merge(tpm_key[c("KO", "Label", "Pathway")] %>% unique(), by = "KO") %>%
-    .[.$p.value.char != "-", ]
+    .[.$p.value.char != "-", ] %>%
+    mutate(p.value.char = gsub("\\.", "·", get("p.value.char")))
 
   tpm_key_1 <-
     tpm_key %>%
@@ -61,7 +62,7 @@ report__tpm_key_bar_group <- function(tpm_key) {
   #### add paint                                                            ####
   font_size_1 <- 14
   font_size_2 <- 11
-  font_size_3 <- 2.5
+  font_size_3 <- 2.6
   axis.ticks.length <- 0.1 # nolint: object_name_linter.
 
   p <-
@@ -79,7 +80,7 @@ report__tpm_key_bar_group <- function(tpm_key) {
     ) +
     geom_label(
       data =
-        tpm_key.signif %>%
+        tpm_key_signif %>%
           .[.$p.value.char != "", ],
       mapping = aes_string(
         x = "Label", y = "Max. + max(Max.) * 0.05",
@@ -155,7 +156,7 @@ tpm_key <-
 #### Plot figures and OUTPUT                                                ####
 ### ######################################################################## ###
 ##### Plot figures                                                         #####
-# key_genes %>% .$Pathway %>% {data.frame(table(.), cumsum(table(.)))}
+#' key_genes %>% .$Pathway %>% {data.frame(table(.), cumsum(table(.)))}
 p1 <-
   tpm_key %>%
   {
