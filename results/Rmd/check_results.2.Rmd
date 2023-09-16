@@ -1,7 +1,7 @@
 ---
 Date: 2023-09-13 12:05:31
 LastEditors: Hwrn hwrn.aou@sjtu.edu.cn
-LastEditTime: 2023-09-14 20:40:30
+LastEditTime: 2023-09-16 16:01:23
 FilePath: /2021_09-MT10kSW/results/Rmd/check_results.2.Rmd
 Description:
 output:
@@ -30,7 +30,7 @@ source("workflow/utils/RLib.local/R/init.r", chdir = TRUE)
 ```
 
 ```{r load_data, cache=TRUE, dependson=c("config")}
-Wtdb_abd <- # nolint
+wtdb_abd <- # nolint
   stringr::str_glue("Wtdb.relative_abundance.tsv") %>%
   file_path$file_path$results() %>%
   as.character()
@@ -38,7 +38,7 @@ Wtdb_abd <- # nolint
 Stdb <- load__Stdb() # nolint
 Wtdb <- load__Wtdb() # nolint
 genome_taxonomy <- load__genome_taxonomy(load__Stdb(), load__Wtdb())
-genome_rltabd <- get_relative_abundance(Wtdb_abd, genome_taxonomy)
+genome_rltabd <- get_relative_abundance(wtdb_abd, genome_taxonomy)
 
 taxon_color <- load__taxon_color()
 
@@ -181,7 +181,184 @@ genomeko_N <- # nolint
 
 ### Genes involved in sulfur metabolism
 
-- For sulfur metabolism, a lot of genes involve in 
+- - For sulfur metabolism, a lot of genes were observed in water and sediment samples in the bottom and slope with high abundance.
+  - Similar to nitrogen cycling,
+    abundance of gene were simialr between Ss and Sw samples
+      but usually significantly different between Bs and Bw samples.
+  - Meanwhile, the abundance of genes
+      involved in SOX system and dissimilatory sulfite reduction
+      is much lower in Bw samples
+
+## Comparison of metabolic capabilities in sulfur cycling between the seawater and sediment on the slope and bottom
+```{r}
+key_genes_S <- # nolint
+  key_genes %>%
+  .[.$Pathway == "S", ]
+
+genome_ext <-
+  genome_rltabd %>%
+  {
+    data.frame(
+      "Genome" = .$Genome,
+      "Class" = .$Taxonomy %>% taxon.split(1, 3),
+      "Taxonomy" = .$Taxonomy %>% taxon.split(1, 7),
+      "Layer" = .$Layer, "Group" = .$Group,
+      "Exist" = TRUE
+    )
+  }
+genome_ext_group <-
+  genome_ext %>%
+  .[c("Genome", "Class", "Group", "Taxonomy")] %>%
+  split(.$Genome) %>%
+  lapply(. %>%
+    {
+      .$Group <- .$Group %>%
+        unique() %>%
+        sort() %>%
+        paste(collapse = ",")
+      .
+    } %>%
+    head(1)) %>%
+  bind_rows()
+
+gene_ko_tpm_S <- # nolint: object_name_linter.
+  load__gene_ko_tpm() %>%
+  .[.$KO %in% key_genes_S$KO, ]
+
+key_gene_genome_layer <-
+  gene_ko_tpm_S %>%
+  mutate(Genome = gsub(".fa$", "", get("Genome"))) %>%
+  merge(genome_taxonomy[c("Cluster", "Genome")]) %>%
+  mutate(Genome = NULL) %>%
+  merge(
+    genome_taxonomy[c("Cluster", "Genome", "Rep")] %>% .[.$Rep, ]
+  ) %>%
+  group_by(KO = get("KO"), Layer = get("Layer"), Genome = get("Genome")) %>%
+  summarise(TPM = sum(get("TPM"))) %>%
+  merge(
+    genome_ext[c("Layer", "Group")] %>% unique()
+  ) %>%
+  merge(genome_ext[c("Genome", "Layer", "Exist")], all.x = TRUE) %>%
+  mutate(TPM.adj = get("TPM") * (1 - 2 * is.na(get("Exist"))))
+
+df <-
+  key_gene_genome_layer %>%
+  mutate(Sum = 0) %>%
+  merge(key_genes_S) %>%
+  reshape2::dcast(formula("Genome + Group + Layer + Sum ~ Label"),
+    value.var = "TPM.adj"
+  ) %>%
+  {
+    .$Sum <- apply(.[-(1:4)], 1, . %>% .[!is.na(.)] %>% abs() %>% sum())
+    .
+  } %>%
+  split(.$Group) %>%
+  # lapply(function(df) {df[order(df$Layer, df$Taxonomy, df$Sum),]}) %>%
+  bind_rows()
+
+df %>%
+  split(.$Group) %>%
+  lapply(. %>%
+    {
+      split(.[-(1:4)], .$Layer %>% as.character())
+    }) %>%
+  lapply(
+    . %>% lapply(. %>% apply(2, . %>% .[!is.na(.)] %>% abs() %>% sum()))
+  ) %>%
+  lapply(
+    . %>% bind_rows()
+  ) %>% # .id = "Layer"))
+  lapply(
+    . %>% apply(2, . %>% .[. > 0] %>% median())
+  ) %>%
+  bind_rows(.id = "Group") %>%
+  column_to_rownames("Group") %>%
+  t() %>%
+  as.data.frame() %>%
+  rownames_to_column("Label") %>%
+  merge(key_genes_S[c("Label", "KO", "Pathway")]) %>%
+  .[order(.$KO), ]
+
+genome_group <- function(label, fun_aggregate = length) {
+  is.na(df[label]) %>% # nolint: object_usage_linter.
+    {
+      !.
+    } %>%
+    apply(1, all) %>%
+    df[., c("Genome", "Group", "Layer", label)] %>%
+    reshape2::dcast(
+      formula("Genome ~ Group"),
+      fun.aggregate = fun_aggregate, value.var = label
+    ) %>%
+    merge(genome_ext_group) %>%
+    data.frame() %>%
+    {
+      .$Genome <- NULL
+      .
+    }
+}
+```
+
+```{r}
+c("cysJ") %>%
+  `names<-`(., .) %>%
+  genome_group(
+    . %>% abs() %>% median()
+  ) %>%
+  {
+    select_rows <-
+      .[1:(length(.) - 3)] %>%
+      lapply(
+        ., . %>% order(decreasing = TRUE) %>% head(10)
+      ) %>%
+      unlist() %>%
+      unique()
+    .[select_rows, ]
+  }
+```
+
+- We next focused key metabolic genes related to the sulfur cycle,
+    and found that the abundance of sulfur metabolism genes in Bw
+    were generally lower than that in the Bs and slope samples.
+- For sulfate reduction,
+  genes involved in assimlatory pathway (cysC, cysH, and cysI)
+    were commonly used in all four groups.
+- However,
+  communities in Bs, Ss and Sw samples preferred to use dissimilatory enzymes
+    for nitrate reduction (Sat, aprAB) and nitrite reduction (dsrAB)
+  compared to Bw samples.
+- Another assimilatory nitrite reduction enzymes (sir) was more abundant in Bs compared with Bw samples.
+- In Bw samples, a higher abundance of assimilatory enzymes (cysN, cysD, and cysJ)
+    was obtained, and most cysJ genes were carried by Gammaproteobacteria MAGs.
+
+```{r}
+c("cysK") %>%
+  `names<-`(., .) %>%
+  genome_group(
+    . %>% abs() %>% median()
+  ) %>%
+  {
+    select_rows <-
+      .[1:(length(.) - 3)] %>%
+      lapply(
+        ., . %>% order(decreasing = TRUE) %>% head(10)
+      ) %>%
+      unlist() %>%
+      unique()
+    .[select_rows, ]
+  }
+```
+
+- The enzyme for sulfide utilization (cysK) were widely distributed in diverse lineages.
+- Interestingly, while the dominant cysK genes in Bs, Ss, and Sw were annotated from Nitrososphaeria MAGs,
+  the dominant cysK gene in Bw was annotated in Gammaproteobacteria.
+- Besides, higher potential of sulfide:quinone oxidoreductase (sqr) were found in sediment compared to water samples.
+
+- Genes encoding SOX complex for thiosulfate oxidation were also annotated from all four groups.
+- The abundance of all SOX genes from Bs were significantly higher than that in Bw.
+- However, SOX genes abundance between Ss and Sw were comparable and similar to Bs samples.
+- In water samples, thiosulfate were likely to be catalyzed into sulfite according to
+    higher abundance of glpE compared to sediment samples.
 
 ## Discussion
 - Furthermore, the results here also show that the V-shaped topography of the CD in the Mariana Trench impacts the environmental conditions of the bottom and slope, which shapes the prokaryotic community, affects their metabolic potential, and further influences prokaryote-mediated elemental cycling (Fig. 4, Fig. 5).
