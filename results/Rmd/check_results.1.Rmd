@@ -370,6 +370,22 @@ freq.phylum <-
         This included the `r taxon.split(names(unlist(freq.phylum)), 2)[unlist(freq.phylum) == 1]`.
 
 ```{r}
+genome_rltabd %>%
+  mutate(Class = taxon.split(get("Taxonomy"), 1, 3)) %>%
+  pivot_wider(
+    id_cols = "Class", names_from = "Sample",
+    values_from = "Relative_abundance", values_fn = sum, values_fill = 0
+  ) %>%
+  {
+    write.table(
+      ., "results/tabs/tabS2_class_rltabd.tsv",
+      sep = "\t", row.names = FALSE, quote = FALSE
+    )
+    .
+  }
+```
+
+```{r}
 v <- list(
   bw.dom =
     genome_rltabd %>%

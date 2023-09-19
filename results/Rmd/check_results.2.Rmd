@@ -72,6 +72,10 @@ gene_ko_tpm_N <- # nolint
   .[.$KO %in% key_genes_N$KO, ]
 genomeko_N <- # nolint
   load__genomeko() %>%
+  {
+    write.csv(., "results/tabs/tabS4_gko.csv", quote = FALSE)
+    .
+  } %>%
   .[
     rownames(.) %>% .[. %in% key_genes_N$KO],
   ] %>%
@@ -79,6 +83,43 @@ genomeko_N <- # nolint
 ```
 
 ## Results 2 Comparison of metabolic capabilities in nitrogen cycling between the seawater and sediment on the slope and bottom
+
+```{r}
+merge(
+  Wtdb[c("Cluster", "Cluster_members", "Taxonomy")],
+  Stdb[
+    c(
+      "Genome", "Secondary_cluster",
+      "Completeness", "Contamination",
+      "Genomesize", "Gc"
+    )
+  ],
+  by.x = "Cluster", by.y = "Secondary_cluster"
+) %>%
+  filter(get("Genome") %in% Wtdb$Genome) %>%
+  mutate(Genome = gsub(".fa$", "", get("Genome"))) %>%
+  {
+    write.table(
+      ., "results/tabs/tabS4_genome_feature.tsv",
+      sep = "\t", row.names = FALSE, quote = FALSE
+    )
+    .
+  }
+
+gene_ko_tpm_N %>%
+  pivot_wider(
+    id_cols = "KO", names_from = "Layer",
+    values_from = "TPM", values_fn = sum, values_fill = 0
+  ) %>%
+  {
+    write.table(
+      ., "results/tabs/tabS3_sample_ko_tpm.tsv",
+      sep = "\t", row.names = FALSE, quote = FALSE
+    )
+    .
+  }
+```
+
 - We further focused on the abundance of key metabolic genes from these MAGs
     (Fig. 4, Supplemental Fig. S3, Supplemental Fig. S5).
 - In general, key genes that were related to the nitrogen cycle
