@@ -1,7 +1,7 @@
 """
  * @Date: 2022-05-28 23:04:47
  * @LastEditors: Hwrn hwrn.aou@sjtu.edu.cn
- * @LastEditTime: 2023-04-24 21:29:25
+ * @LastEditTime: 2023-09-19 11:28:37
  * @FilePath: /2021_09-MT10kSW/workflow/MAGs_tpm/MAGs_tpm.smk
  * @Description:
 """
@@ -243,15 +243,18 @@ rule icamp_boot_summary_groups_pie:
 rule icamp_boot_summary_groups_bar:
     input:
         boot_summary_groups="results/MAGs/icamp.iCAMP.BootSummary.Groups.RPKM.csv",
+        boot_16S_summary_groups="results/reads_diversity/ProcessImportance_16S.csv",
+        r="workflow/MAGs_tpm/boot_summary_groups_bar.r",
     output:
         icamp_boot_summary_groups_pie=file_path.figs("icamp_boot_summary_groups_bar"),
     conda:
         "R4.1"
     shell:
         """
-        Rscript workflow/MAGs_tpm/boot_summary_groups_bar.r \
+        Rscript {input.r} \
             {output.icamp_boot_summary_groups_pie} \
-            {input.boot_summary_groups}
+            {input.boot_summary_groups} \
+            {input.boot_16S_summary_groups}
         """
 
 
