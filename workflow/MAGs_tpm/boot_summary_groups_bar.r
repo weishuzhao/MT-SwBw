@@ -1,7 +1,7 @@
 ###
 #' @Date: 2022-10-09 16:13:56
 #' @LastEditors: Hwrn hwrn.aou@sjtu.edu.cn
-#' @LastEditTime: 2023-09-19 11:13:55
+#' @LastEditTime: 2023-09-20 19:46:06
 #' @FilePath: /2021_09-MT10kSW/workflow/MAGs_tpm/boot_summary_groups_bar.r
 #' @Description:
 ###
@@ -73,8 +73,10 @@ icamp2 <-
   dplyr::select("Group", "Mean", "Process", "Compare")
 
 p <-
-  list("MG" = icamp, "16S" = icamp2) %>%
+  list("Metagenome" = icamp, "16S rRNA" = icamp2) %>%
   bind_rows(.id = "DataType") %>%
+  filter(get("Compare") == "compare") %>%
+  mutate(DataType = factor(get("DataType"), c("Metagenome", "16S rRNA"))) %>%
   ggplot(
     data = .,
     mapping = aes_string(x = "Group", y = "Mean", fill = "Process")
@@ -112,7 +114,7 @@ p <-
   ) + # stack
   scale_fill_manual(values = assebly_factor_col) +
   facet_grid(
-    formula(". ~ DataType + Compare"),
+    formula(". ~ DataType"),
     scales = "free_x", space = "free_x"
   ) +
   theme(
@@ -125,8 +127,7 @@ p <-
   theme(legend.key = element_blank()) +
   theme(
     strip.background = element_blank(),
-    strip.placement = "outside",
-    strip.text.x = element_blank()
+    strip.placement = "outside"
   )
 # p
-ggsave(filename = fig_out, plot = p, width = 10, height = 6, limitsize = FALSE)
+ggsave(filename = fig_out, plot = p, width = 8, height = 6, limitsize = FALSE)
