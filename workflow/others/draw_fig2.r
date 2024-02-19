@@ -1,7 +1,7 @@
 ###
 #' @Date: 2022-07-20 13:43:25
 #' @LastEditors: Hwrn hwrn.aou@sjtu.edu.cn
-#' @LastEditTime: 2023-09-07 21:46:43
+#' @LastEditTime: 2024-02-19 11:05:22
 #' @FilePath: /2021_09-MT10kSW/workflow/others/draw_fig2.r
 #' @Description:
 ###
@@ -190,29 +190,26 @@ p2 <-
   )
 p2_x <- p2 +
   scale_fill_manual(
-    values =
-      c(taxon_color$LEGEND_COLORS) %>%
-        {
-          names(.) <- taxon_color$Taxa_label
-          .
-        } %>%
-        .[order(names(.))]
+    values = c(taxon_color$LEGEND_COLORS) %>%
+      {
+        names(.) <- taxon_color$Taxa_label
+        .
+      } %>%
+      .[order(names(.))]
   ) +
   scale_x_discrete(
-    limits =
-      sample_meta[c("Site", "Layers")] %>%
-        apply(1, . %>% paste(collapse = ".."))
+    limits = sample_meta[c("Site", "Layers")] %>%
+      apply(1, . %>% paste(collapse = ".."))
   ) +
   theme(axis.text.x = element_text(color = sample_meta_col[sample_meta$Group]))
 
 
 ##### OUTPUT                                                               #####
-pout <-
-  p1s$jaccard + p1s$bray + p2_x +
-    plot_layout(
-      design = "AB\nCC",
-      guides = "collect"
-    ) +
-    plot_annotation(tag_levels = "A", tag_prefix = "(", tag_suffix = ")") &
-    theme(plot.tag = element_text(size = 18))
+pout <- p1s$jaccard + p1s$bray + p2_x +
+  plot_layout(
+    design = "AB\nCC",
+    guides = "collect"
+  ) +
+  plot_annotation(tag_levels = "A", tag_prefix = "(", tag_suffix = ")") &
+  theme(plot.tag = element_text(size = 18))
 ggsave(filename = fig_out, plot = pout, width = 13, height = 10)

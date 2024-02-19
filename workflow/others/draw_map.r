@@ -1,7 +1,7 @@
 ###
 #' @Date: 2022-06-28 20:35:49
 #' @LastEditors: Hwrn hwrn.aou@sjtu.edu.cn
-#' @LastEditTime: 2023-11-10 16:47:26
+#' @LastEditTime: 2023-11-14 19:50:44
 #' @FilePath: /2021_09-MT10kSW/workflow/others/draw_map.r
 #' @Description:
 ###
@@ -77,19 +77,12 @@ par(mar = rep(0, 4)) %>%
 sf <-
   as.data.frame(co2) %>%
   `colnames<-`(c("Depth", "Longitude", "Latitude"))
-  {
-    message.print(summary(.))
-    .
-  }
 
 
-sample_site_meta <-
-  sample_meta %>%
-  filter(!duplicated(get("Site"))) %>%
+sample_site_meta <- sample_meta %>%
   list(
     metagenome = .,
-    "16S" =
-      read.csv("data/sample_meta_16S.tsv", sep = "\t") %>%
+    "16S" = read.csv("data/sample_meta_16S.tsv", sep = "\t") %>%
       `colnames<-`(
         c("Site", "Latitude", "Longitude", "Depth", "Group", "Type")
       ) %>%
@@ -98,7 +91,19 @@ sample_site_meta <-
         Layers = ifelse(grepl("s$", get("Group")), "sediment", "water")
       )
   ) %>%
-  bind_rows(.id = "Type")
+  bind_rows(.id = "Type") %>%
+  group_by(Site, Group, Depth, Latitude, Longitude, Type) %>%
+  summarise(Layers = paste(unique(Layers), collapse = ", ")) %>%
+  ungroup() %>%
+  mutate(
+    LayersType = paste0(Layers, " (", Type, ")"), Layers = NULL, Type = NULL
+  ) %>%
+  group_by(
+    Site, Group, Depth,
+    Latitude = round(Latitude, 3), Longitude = round(Longitude, 3)
+  ) %>%
+  summarise(LayerTypes = paste(unique(LayersType), collapse = "; ")) %>%
+  data.frame()
 
 p <- ggplot(
   data = sf,
@@ -115,7 +120,6 @@ p <- ggplot(
     limits = c(-11000, -1000), n.breaks = 11
   ) +
   ggnewscale::new_scale_fill() +
-
   geom_point(
     data = sample_site_meta,
     mapping = aes_string(
@@ -128,7 +132,6 @@ p <- ggplot(
     colors = paletteer::paletteer_c("ggthemes::Classic Orange-Blue", 30)
   ) +
   scale_fill_manual(values = sample_meta_col) +
-
   guides(color = guide_colorbar(title = "Sample Depth")) +
   labs(x = "Longitude (E)", y = "Latitude (N)")
 

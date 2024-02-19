@@ -13,7 +13,7 @@ source("workflow/utils/RLib.local/R/init.r", chdir = TRUE)
 ### ######################################################################## ###
 ##### INPUT: file_path, fig_out_path, keyword_args                         #####
 Wtdb_abd = argv[1]
-#Wtdb_abd = stringr::str_glue("Stdb.relative_abundance.tsv") %>% file_path$file_path$results() %>% as.character
+#Wtdb_abd = stringr::str_glue("Wtdb.relative_abundance.tsv") %>% file_path$file_path$results() %>% as.character
 fig_out = argv[2]
 
 
@@ -28,6 +28,31 @@ axis.ticks.length = 0.1
 genome_taxonomy = load__genome_taxonomy(load__Stdb(), load__Wtdb())
 genome.relative_abundance = get_relative_abundance(Wtdb_abd, genome_taxonomy)
 
+sample_meta_cross <-
+  read.csv("results/reads_diversity/metadata.tsv", sep = "\t") %>%
+  mutate(
+    X = get("Sample"),
+    Layer = ifelse(
+      get("Type") == "16s", get("Sample"), gsub("^[^_]+_", "", get("Sample"))
+    ),
+    Sample = paste0(get("Group"), "_", get("Layer"))
+  ) %>%
+  merge(unique(sample_meta[c("Location", "Group")]))
+
+otu_count <-
+  "results/reads_diversity/level-7.csv" %>%
+  {
+    df <- read.csv(.)
+    colnames(df) <-
+      c("X", read.csv(., header = FALSE)[1, -1])
+    df
+  } %>%
+  dplyr::select(
+    -c("Layers", "Depth", "Latitude", "Longitude", "Location", "Group")
+  ) %>%
+  pivot_longer(!c("X"), names_to = "Taxonomy", values_to = "ReadsCount") %>%
+  merge(sample_meta_cross) %>%
+  filter(get("ReadsCount") > 0)
 
 ### ######################################################################## ###
 #### Define function AND Calculate data                                     ####
@@ -35,6 +60,35 @@ genome.relative_abundance = get_relative_abundance(Wtdb_abd, genome_taxonomy)
 ##### Define function                                                      #####
 
 ##### Calculate data                                                       #####
+genome.relative_abundance %>%
+  mutate(FakeCount = ceiling(get("Relative.abundance") * 1000)) %>%
+  pivot_wider(
+    id_cols = "Taxonomy", names_from = "Sample",
+    values_from = "FakeCount", values_fill = 0
+  ) %>%
+  column_to_rownames("Taxonomy") %>%
+  t() %>%
+  vegan::estimateR() %>%
+  t() %>%
+  as.data.frame() %>%
+  rownames_to_column("Sample") %>%
+  dplyr::arrange(get("Sample"))
+
+otu_count %>%
+  pivot_wider(
+    id_cols = "Taxonomy", names_from = "Sample",
+    values_from = "ReadsCount", values_fill = 0
+  ) %>%
+  column_to_rownames("Taxonomy") %>%
+  t() %>%
+  vegan::estimateR() %>%
+  t() %>%
+  as.data.frame() %>%
+  rownames_to_column("Sample") %>%
+  dplyr::arrange(get("Sample")) %>%
+  mutate(Group = gsub("^([^_]+)_.+$", "\\1", get("Sample"))) %>%
+  filter(grepl("s$", get("Group"))) %>%
+  wilcox.test(formula("S.chao1 ~ Group"), data = ., paired = FALSE)
 
 ### ######################################################################## ###
 #### Plot figures and OUTPUT                                                ####
