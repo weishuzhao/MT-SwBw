@@ -1,8 +1,8 @@
 ###
 #' @Date: 2022-05-18  17:46:00
 #' @Editor: Wang Jing
-#' @LastEditors: Hwrn
-#' @LastEditTime: 2022-09-22 17:04:35
+#' @LastEditors: Hwrn hwrn.aou@sjtu.edu.cn
+#' @LastEditTime: 2024-02-21 16:08:38
 #' @FilePath: /2021_09-MT10kSW/workflow/MAGs/ko_class_heatmap_N.r
 #' @Description:
 ###
@@ -13,26 +13,32 @@ source("workflow/utils/RLib.local/R/init.r", chdir = TRUE)
 #### Preprocessing                                                          ####
 ### ######################################################################## ###
 ##### INPUT: file_path, keyword_args, fig_out_path                         #####
-Wtdb_abd = argv[1]
-#Wtdb_abd = stringr::str_glue("Stdb.relative_abundance.tsv") %>% file_path$file_path$results() %>% as.character
-fig_out = argv[2]
+Wtdb_abd <- argv[1]
+# Wtdb_abd = stringr::str_glue("Stdb.relative_abundance.tsv") %>% file_path$file_path$results() %>% as.character
+fig_out <- argv[2]
 
 ##### LOAD data AND transform TO basic format                              #####
-Stdb = load__Stdb()
-Wtdb = load__Wtdb()
-genome_taxonomy = load__genome_taxonomy(Stdb, Wtdb)
-genome.relative_abundance = get_relative_abundance(Wtdb_abd, genome_taxonomy)
+stdb <- load__Stdb()
+wtdb <- load__Wtdb()
+genome_taxonomy <- load__genome_taxonomy(stdb, wtdb)
+genome_rltabd <- get_relative_abundance(Wtdb_abd, genome_taxonomy)
 
-key_genes = load__key_genes()
-key_genes_N =
-  key_genes %>% .[.$Pathway == "N",] %>%
-  {.$Pathway = .$Arrow %>% factor(levels = unique(.)); .}
+key_genes <- load__key_genes()
+key_genes_N <- # nolint: object_name_linter.
+  key_genes %>%
+  .[.$Pathway == "N", ] %>%
+  {
+    .$Pathway <- .$Arrow %>% factor(levels = unique(.))
+    .
+  }
 
-pathway_col = set__pathway_col(key_genes_N$Pathway)
+pathway_col <- set__pathway_col(key_genes_N$Pathway)
 
-genomeko = load__genomeko()
-genomeko.key =
-  genomeko[key_genes_N$KO %>% as.character, ] %>%
+genomeko <- load__genomeko()
+genomeko_key <-
+  genomeko[
+    key_genes_N$KO %>% as.character(),
+  ] %>%
   .[apply(., 1, sum) > 0, apply(., 2, sum) > 0]
 
 
@@ -42,55 +48,91 @@ genomeko.key =
 ##### Define function                                                      #####
 
 ##### Calculate data                                                       #####
-annotation_class =
-  genome.relative_abundance %>%
-  {.$name = taxon.split(.$Taxonomy, 1, 3); .} %>%
+annotation_class <-
+  genome_rltabd %>%
+  {
+    .$name <- taxon.split(.$Taxonomy, 1, 3)
+    .
+  } %>%
   get_taxon_group("name") %>%
-  {rownames(.) = .$name; .$name <- NULL; .}
+  {
+    rownames(.) <- .$name
+    .$name <- NULL
+    .
+  }
 
-classlocko_pct =
-  Wtdb %>%
-  {.$Genome = .$Genome %>% gsub(".fa$", "", .); .} %>%
-  .[.$Genome %in% colnames(genomeko.key), ] %>%
-  {split(genomeko.key[, .$Genome] %>% t %>% data.frame, .$Taxonomy %>% taxon.split(1, 3))} %>%
-  lapply(. %>% apply(2, . %>% {sum(. > 0) / length(.)})) %>%
-  bind_rows(.id = "Class") %>% column_to_rownames("Class")
+classlocko_pct <-
+  wtdb %>%
+  {
+    .$Genome <- .$Genome %>% gsub(".fa$", "", .)
+    .
+  } %>%
+  .[.$Genome %in% colnames(genomeko_key), ] %>%
+  {
+    split(
+      genomeko_key[, .$Genome] %>% t() %>% data.frame(),
+      .$Taxonomy %>% taxon.split(1, 3)
+    )
+  } %>%
+  lapply(. %>% apply(2, . %>%
+    {
+      sum(. > 0) / length(.)
+    })) %>%
+  bind_rows(.id = "Class") %>%
+  column_to_rownames("Class")
 
 
 ### ######################################################################## ###
 #### Plot figures and OUTPUT                                                ####
 ### ######################################################################## ###
 ##### Plot figures                                                         #####
-p =
+p <-
   classlocko_pct %>%
   {
-    annotation_col =
+    annotation_col <-
       key_genes_N %>%
       {
         data.frame(
           Pathway = .$Pathway, Label = .$Label, row.names = .$KO
         )
       }
-    d = .
+    d <- .
     pheatmap::pheatmap(
-      d %>% {.[. == 0] = NA; .},
+      d %>%
+        {
+          .[. == 0] <- NA
+          .
+        },
       cellwidth = 10, cellheight = 10,
       cluster_cols = FALSE, cluster_rows = FALSE,
       na_col = "white",
       color = RColorBrewer::brewer.pal(n = 9, name = "OrRd")[c(3, 5, 8)],
       breaks = c(0, 0.2, 0.5, 1),
       legend_breaks = c(0, 0.2, 0.5, 1),
-      gaps_col = annotation_col["Pathway"] %>% table %>% .[. > 0] %>% cumsum,
+      gaps_col = annotation_col["Pathway"] %>%
+        table() %>%
+        .[. > 0] %>%
+        cumsum(),
       annotation_row = annotation_class,
-      annotation_col = annotation_col[c("Pathway", "Label")] %>% {.["Label"] = NULL; .},
-      labels_col = annotation_col[, "Label"] %>% as.character,
+      annotation_col = annotation_col[c("Pathway", "Label")] %>%
+        {
+          .["Label"] <- NULL
+          .
+        },
+      labels_col = annotation_col[, "Label"] %>% as.character(),
       annotation_colors =
         append(
           sample_meta_col %>%
-            Map(function(x, i) {c(i, "#FFFFFF") %>% {names(.) = c(x, ""); .}}, names(.), .),
+            Map(function(x, i) {
+              c(i, "#FFFFFF") %>%
+                {
+                  names(.) <- c(x, "")
+                  .
+                }
+            }, names(.), .),
           list(
             "Group" = sample_meta_col,
-            "Pathway" = pathway_col[annotation_col$Pathway %>% unique]
+            "Pathway" = pathway_col[annotation_col$Pathway %>% unique()]
           )
         ),
       silent = TRUE
