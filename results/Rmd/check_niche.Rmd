@@ -1,0 +1,171 @@
+---
+Date: 2024-02-19 14:11:51
+LastEditors: Hwrn hwrn.aou@sjtu.edu.cn
+LastEditTime: 2024-02-21 16:28:32
+FilePath: /2021_09-MT10kSW/results/Rmd/check_niche.Rmd
+output:
+  html_document:
+    df_print: paged
+    theme: cerulean
+    highlight: haddock
+    toc: yes
+    toc_depth: 3
+    toc_float:
+      collapsed: no
+      smooth_scroll: yes
+    code_fold: hide
+title: MAG co-occurence pattern
+---
+
+```{r setup, include=FALSE}
+knitr::opts_knit$set(root.dir = "~/Work/2021_09-MT10kSW/")
+```
+
+```{r config, message=FALSE, warning=FALSE}
+source("workflow/utils/RLib.local/R/init.r", chdir = TRUE)
+```
+
+```{r load_data, cache=TRUE, dependson=c("config")}
+taxon_color <- load__taxon_color()
+
+stdb <- load__Stdb()
+wtdb <- load__Wtdb()
+genome_taxonomy <- load__genome_taxonomy(stdb, wtdb)
+
+genome_rltabd <-
+  stringr::str_glue("Wtdb.relative_abundance.tsv") %>%
+  file_path$file_path$results(.) %>%
+  as.character() %>%
+  get_relative_abundance(genome_taxonomy) %>%
+  mutate(
+    Taxa_label = sapply(taxon.split(get("Taxonomy"), 1, 7), get_taxon_color)
+  )
+
+genomeko <- load__genomeko()
+
+#' gene_ko_tpm <- load__gene_ko_tpm()
+
+key_genes <- load__key_genes()
+pathway_col <- set__pathway_col(key_genes$Pathway)
+```
+
+
+```{r define function}
+genome_jaccard_network <- function(
+    genomeko,
+    ko_spec = NA, genome_spec = NA,
+    threshold = 0.3,
+    key_genes = key_genes, pathway_col = pathway_col) {
+  ko_spec <- if (any(is.na(ko_spec))) {
+    rownames(genomeko)
+  } else {
+    ko_spec %>% .[. %in% rownames(genomeko)] # nolint: object_usage_linter.
+  }
+  genome_spec <- if (any(is.na(genome_spec))) {
+    colnames(genomeko)
+  } else {
+    genome_spec %>% .[. %in% colnames(genomeko)] # nolint: object_usage_linter.
+  }
+
+  genomeko_key <-
+    genomeko %>% # nolint: object_usage_linter.
+    .[ko_spec, genome_spec] %>% # nolint: object_usage_linter.
+    .[apply(., 1, sum) > 0, apply(., 2, sum) > 0]
+
+  key_genes_spec <- key_genes[rownames(genomeko_key), ]
+
+  m_d <- vegan::vegdist(genomeko_key, method = "jaccard", binary = TRUE)
+
+  E <- igraph::E # nolint: object_name_linter.
+  V <- igraph::V # nolint: object_name_linter.
+
+  g <-
+    igraph::graph_from_adjacency_matrix(
+      1 - as.matrix(m_d),
+      weighted = TRUE, mode = "undirected", diag = FALSE
+    ) %>% # nolint: object_usage_linter.
+    igraph::delete.edges(
+      ., E(.) %>% .[.$weight < threshold] # nolint: object_usage_linter.
+    ) %>%
+    igraph::delete.vertices(., V(.)[igraph::degree(.) == 0])
+
+  igraph::plot.igraph(
+    g,
+    layout = igraph::layout_with_fr,
+    edge.width = E(g)$weight * 3,
+    vertex.size = 14,
+    vertex.label = key_genes_spec$Label[
+      match(V(g)$name, rownames(key_genes_spec))
+    ],
+    vertex.label.cex = 0.8,
+    vertex.label.font = 2,
+    vertex.label.family = "Arial",
+    vertex.color = pathway_col[
+      key_genes_spec$Pathway[match(V(g)$name, rownames(key_genes_spec))]
+    ],
+    vertex.frame.color = "gray",
+    asp = 0
+  )
+}
+```
+
+```{r, fig.width=12, fig.height=12}
+genomeko[as.character(key_genes$KO), ] %>%
+  .[apply(., 1, sum) > 0, apply(., 2, sum) > 0] %>%
+  genome_jaccard_network(
+    genome_spec = NA,
+    key_genes = key_genes %>%
+      column_to_rownames("KO") %>%
+      .[c("Label", "Pathway")],
+    pathway_col = pathway_col
+  )
+```
+
+```{r mag_abd_cut, fig.width=12, fig.height=12}
+for (min_cutoff in c(0.00001, 0.1, 0.5, 1, 10)) {
+  genome_rltabd %>%
+    # filter(get("Group") %in% c("Ss", "Sw")) %>%
+    pivot_wider(
+      id_cols = "Genome", names_from = "Layer",
+      values_from = "Relative_abundance", values_fill = 0
+    ) %>%
+    column_to_rownames("Genome") %>%
+    `>=`(min_cutoff) %>%
+    `+`(0) %>%
+    .[apply(., 1, sum) > 0, apply(., 2, sum) > 0] %>%
+    genome_jaccard_network(
+      key_genes = genome_rltabd[c("Cluster", "Taxa_label", "Genome")] %>%
+        unique() %>%
+        `rownames<-`(.$Genome) %>%
+        `colnames<-`(c("Label", "Pathway", "Genome")),
+      pathway_col = taxon_color %>%
+        with(`names<-`(get("LEGEND_COLORS"), get("Taxa_label")))
+    )
+  title(str_glue("genome co-occurence with min abundance cutoff {min_cutoff}"))
+}
+```
+
+```{r mag_abd_cut_weight, fig.width=12, fig.height=12}
+for (min_weight in c(0.3, 0.4, 0.5, 0.7, 0.8)) {
+  genome_rltabd %>%
+    # filter(get("Group") %in% c("Ss", "Sw")) %>%
+    pivot_wider(
+      id_cols = "Genome", names_from = "Layer",
+      values_from = "Relative_abundance", values_fill = 0
+    ) %>%
+    column_to_rownames("Genome") %>%
+    `>`(0) %>%
+    `+`(0) %>%
+    .[apply(., 1, sum) > 0, apply(., 2, sum) > 0] %>%
+    genome_jaccard_network(
+      threshold = min_weight,
+      key_genes = genome_rltabd[c("Cluster", "Taxa_label", "Genome")] %>%
+        unique() %>%
+        `rownames<-`(.$Genome) %>%
+        `colnames<-`(c("Label", "Pathway", "Genome")),
+      pathway_col = taxon_color %>%
+        with(`names<-`(get("LEGEND_COLORS"), get("Taxa_label")))
+    )
+  title(str_glue("genome co-occurence with min edge weight {min_weight}"))
+}
+```
