@@ -2,7 +2,7 @@
 ---
 Date: 2024-02-19 14:11:51
 LastEditors: Hwrn hwrn.aou@sjtu.edu.cn
-LastEditTime: 2024-02-21 16:30:42
+LastEditTime: 2024-02-22 21:20:58
 FilePath: /2021_09-MT10kSW/results/Rmd/check_niche_tree.Rmd
 output:
   html_document:
@@ -87,34 +87,48 @@ classlocko_pct <-
   column_to_rownames("Class")
 ```
 
-## test example randomforest
+## test randomforest
 ```{r load data}
-# OTU丰度预测植物年龄
-data <- read.table("lc_study_mapping_file.tsv", header = TRUE, sep = "\t")
-raw_otu <- read.table("lc_study_otu_table.tsv", header = TRUE, sep = "\t") %>%
-  `rownames<-`(.[, length(.)]) %>%
-  .[, -length(.)]
-dim(data)
-dim(raw_otu)
+otu_group <- "OTU丰度预测植物年龄" %>%
+  {
+    data <- read.table("lc_study_mapping_file.tsv", header = TRUE, sep = "\t")
+    raw_otu <- read.table(
+      "lc_study_otu_table.tsv",
+      header = TRUE, sep = "\t"
+    ) %>%
+      `rownames<-`(.[, length(.)]) %>%
+      .[, -length(.)]
+    dim(data)
+    dim(raw_otu)
 
-otu <- raw_otu %>%
-  .[1:1000, ] %>%
+    otu <- raw_otu %>%
+      .[1:1000, ] %>%
+      t() %>%
+      .[data$SampleID[data$Compartment == "Endosphere"], ]
+
+    dim(otu)
+
+    data.frame(
+      otu,
+      groups = data[data$Compartment == "Endosphere", "Age"]
+    )
+  }
+
+otu_group <- genomeko %>%
+  .[, unique(genome_rltabd$Genome)] %>%
   t() %>%
-  .[data$SampleID[data$Compartment == "Endosphere"], ]
+  data.frame(
+    groups = as.factor(
+      rownames(.) %in%
+        filter(get_taxon_group(genome_rltabd, "Genome"), get("Bw") != "")$Genome
+    ),
+    .
+  )
 
-dim(otu)
-otu_group <- data.frame(
-  otu,
-  groups = data[data$Compartment == "Endosphere", "Age"]
-)
-dim(otu_group)
-```
-
-```{r do estimation}
 set.seed(1)
 
 select_train <- dim(otu_group)[1] %>% sample(. * 0.7)
-otu_train <- otu_group[select_train, ]
+otu_train <- otu_group
 otu_test <- otu_group[-select_train, ]
 # randomForest
 #' library(randomForest)
@@ -123,61 +137,250 @@ otu_train_forest <- randomForest::randomForest(
   formula("groups ~ ."),
   data = otu_train, importance = TRUE
 )
-otu_train_forest %>%
-  {
-    print(.)
-    # 可以解释时间变化的75.02%
-    print(paste("可以解释时间变化的", .$rsq %>% .[length(.)]))
-
-    otu_train_forest %>%
-      {
-        plot(.$predicted, otu_train$groups, main = "")
-        abline(1, 1)
-      }
-  }
-
-otu_train_forest %>%
-  {
-    plot(predict(., otu_train), otu_train$groups, main = "", col = "blue")
-    points(predict(., otu_test), otu_test$groups, col = "red")
-    abline(1, 1)
-  }
 ```
 
-```{r}
+```{.r rf of each class}
+class_rf <- otu_group %>%
+  split(
+    .,
+    column_to_rownames(genome_taxonomy, "Genome")[rownames(.), "Taxonomy"] %>%
+      taxon.split(1, 3)
+  ) %>%
+  lapply(
+    . %>%
+      {
+        if (length(unique(.$groups)) == 1) {
+          print(
+            paste(
+              column_to_rownames(genome_taxonomy, "Genome")[
+                rownames(.)[1], "Taxonomy"
+              ] %>%
+                taxon.split(1, 3),
+              "均能在 Bw 中存在, 跳过"
+            )
+          )
+          return(NULL)
+        } else {
+          print(
+            paste(
+              column_to_rownames(genome_taxonomy, "Genome")[
+                rownames(.)[1], "Taxonomy"
+              ] %>%
+                taxon.split(1, 3),
+              "..."
+            )
+          )
+        }
+        set.seed(1)
+
+        otu_train <- .
+        otu_train_forest <- randomForest::randomForest(
+          formula("groups ~ ."),
+          data = otu_train, importance = TRUE
+        )
+        otu_train_forest %>%
+          {
+            print(.)
+            # 可以解释时间变化的75.02%
+            if (.$type == "regression") {
+              print(paste("可以解释时间变化的", .$rsq %>% .[length(.)]))
+
+              plot(.$predicted, otu_train$groups, main = "", col = "blue")
+              abline(1, 1)
+            } else if (.$type == "classification") {
+              #' print(table(otu_train$groups, .$predicted))
+              #' 行和是实际值, 列和是预测值
+              print(
+                paste(
+                  column_to_rownames(genome_taxonomy, "Genome")[
+                    rownames(otu_train)[1], "Taxonomy"
+                  ] %>%
+                    taxon.split(1, 3),
+                  "预测的准确率:",
+                  1 - .$err.rate[.$ntree, "OOB"]
+                )
+              )
+            }
+          }
+        otu_train_forest
+      }
+  )
+```
+
+```{r do estimation}
+genome_group_otu <- site_group$Group %>%
+  unique() %>%
+  `names<-`(., .) %>%
+  lapply(
+    . %>%
+      {
+        groups <- filter(
+          get_taxon_group(genome_rltabd, "Genome"), get(.) != ""
+        )$Genome
+        genomeko %>%
+          .[, unique(genome_rltabd$Genome)] %>%
+          t() %>%
+          data.frame(
+            groups = as.factor(rownames(.) %in% groups),
+            .
+          )
+      }
+  )
+
+genome_group_nfs <- site_group$Group %>%
+  unique() %>%
+  `names<-`(., .) %>%
+  lapply(
+    . %>%
+      {
+        otu_group <- genome_group_otu[[.]]
+        set.seed(1)
+
+        select_train <- dim(otu_group)[1] %>% sample(. * 0.8)
+        otu_train <- otu_group
+      } %>%
+      randomForest::randomForest(
+        formula("groups ~ ."),
+        data = ., importance = TRUE
+      )
+  )
+
+site_group$Group %>%
+  unique() %>%
+  lapply(
+    . %>%
+      {
+        print(.)
+        otu_group <- genome_group_otu[[.]]
+
+        genome_group_nfs[[.]] %>%
+          {
+            select_train <- rownames(otu_group) %in% names(.$predicted)
+            otu_train <- otu_group[select_train, ]
+            otu_test <- otu_group[!select_train, ]
+            # 可以解释时间变化的75.02%
+            if (.$type == "regression") {
+              print(paste("可以解释时间变化的", .$rsq %>% .[length(.)]))
+
+              plot(.$predicted, otu_train$groups, main = "")
+              points(predict(., otu_test), otu_test$groups, col = "red")
+              abline(1, 1)
+            } else if (.$type == "classification") {
+              #' print(table(otu_train$groups, .$predicted))
+              #' 行和是实际值, 列和是预测值
+              print(table(otu_train$groups, .$predicted))
+              print(table(otu_test$groups, predict(., otu_test)))
+              print(
+                paste("预测的准确率:", 1 - .$err.rate[.$ntree, "OOB"])
+              )
+              print(
+                paste(
+                  "验证的准确率:",
+                  (function(x) sum(x) / length(x))(
+                    otu_test$groups == predict(., otu_test)
+                  )
+                )
+              )
+            }
+          }
+      }
+  )
+```
+
+```{r, fig.width=7, fig.height=7}
+genome_rltabd %>%
+  group_by(Genome = get("Genome"), Group = get("Group")) %>%
+  summarise(Mean = mean(get("Relative_abundance"))) %>%
+  ungroup() %>%
+  group_by(Group = get("Group")) %>%
+  mutate(
+    Predicted = ifelse(
+      as.logical(
+        genome_group_nfs[[unique(get("Group"))]]$predicted[get("Genome")]
+      ),
+      "predict exist", "predict not exist"
+    ),
+    OBBerr = genome_group_nfs[[unique(get("Group"))]] %>%
+      {
+        .$err.rate[.$ntree, "OOB"]
+      },
+    GroupLabel = paste0(get("Group"), " (Accurate = ", 1 - get("OBBerr"), ")")
+  ) %>%
+  ggplot(mapping = aes_string(x = "Predicted", y = "Mean")) +
+  geom_boxplot() +
+  geom_violin(fill = NA) +
+  # geom_jitter() +
+  ggsignif::geom_signif(
+    #' comparisons = . %>% .$Predicted %>% unique %>% list(.)
+    comparisons = list(c("predict exist", "predict not exist")),
+    tip_length = 0, margin_top = 0.01
+  ) +
+  facet_wrap(formula("GroupLabel ~ ."), nrow = 2) +
+  labs(x = "", y = "Mean abundance") +
+  scale_y_log10() +
+  theme_minimal()
+```
+
+```{r n important factors, fig.width=14, fig.height=6}
 # OTUs
-otu_train_forest %>%
+par(mfrow = c(1, 4)) %>%
   {
-    randomForest::varImpPlot(
-      .,
-      n.var = min(50, nrow(.$importance)),
-      main = "Top 50 - variable importance"
-    )
+    site_group$Group %>%
+      unique() %>%
+      lapply(
+        . %>%
+          {
+            print(.)
+
+            n_var <- 50
+            imp <- randomForest::importance(genome_group_nfs[[.]])
+            ord <- rev(
+              order(imp[, "MeanDecreaseAccuracy"], decreasing = TRUE)[1:n_var]
+            )
+            xmin <- min(imp[ord, "MeanDecreaseAccuracy"])
+            dotchart(
+              imp[ord, "MeanDecreaseAccuracy"],
+              xlab = colnames(imp)["MeanDecreaseAccuracy"],
+              ylab = "",
+              main = .,
+              xlim = c(xmin, max(imp[, "MeanDecreaseAccuracy"]))
+            )
+          }
+      )
+    par(.)
   }
 
 # Mean Decrease Accuracy
-otu_train_forest$importance %>%
-  {
-    print(sum(.[, 1]))
-    importance_top50 <- .[order(.[, "%IncMSE"], decreasing = TRUE), ] %>%
-      .[1:50, "%IncMSE"]
-    sum(importance_top50) / sum(.[, 1]) * 100
-  }
-# 前50个OTU可以解释所有OTU的95.55%
+site_group$Group %>%
+  unique() %>%
+  `names<-`(., .) %>%
+  lapply(
+    . %>%
+      {
+        n_var <- 50
+        imp <- randomForest::importance(genome_group_nfs[[.]])
+        ord <- rev(
+          order(imp[, "MeanDecreaseAccuracy"], decreasing = TRUE)[1:n_var]
+        )
+        data.frame(MeanDecreaseAccuracy = imp[ord, "MeanDecreaseAccuracy"]) %>%
+          rownames_to_column("KO")
+      }
+  ) %>%
+  bind_rows(.id = "Group") %>%
+  inner_join(key_genes)
 ```
 
-```{r otu_train_cv}
+```{.r otu_train_cv}
 set.seed(1)
 otu_train_cv_raw <- replicate(
   5,
   randomForest::rfcv(
-    otu_train[-ncol(otu_train)], otu_train$group, cv.fold = 10, step = 1.5
+    otu_group[-ncol(otu_group)], otu_group$group,
+    cv.fold = 10, step = 1.5
   ),
   simplify = FALSE
 )
-length(otu_train_cv_raw)
 
-#
 otu_train_cv <- data.frame(sapply(otu_train_cv_raw, "[[", "error.cv")) %>%
   mutate(otus = as.numeric(rownames(.))) %>%
   pivot_longer(!"otus", names_to = "variable", values_to = "value")
