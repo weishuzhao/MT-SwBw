@@ -2,7 +2,7 @@
 #' @Date: 2022-05-18  17:46:00
 #' @Editor: Wang Jing
 #' @LastEditors: Hwrn hwrn.aou@sjtu.edu.cn
-#' @LastEditTime: 2024-02-21 16:08:38
+#' @LastEditTime: 2024-02-21 20:47:02
 #' @FilePath: /2021_09-MT10kSW/workflow/MAGs/ko_class_heatmap_N.r
 #' @Description:
 ###
@@ -50,34 +50,29 @@ genomeko_key <-
 ##### Calculate data                                                       #####
 annotation_class <-
   genome_rltabd %>%
-  {
-    .$name <- taxon.split(.$Taxonomy, 1, 3)
-    .
-  } %>%
+  mutate(name = taxon.split(get("Taxonomy"), 1, 3)) %>%
   get_taxon_group("name") %>%
-  {
-    rownames(.) <- .$name
-    .$name <- NULL
-    .
-  }
+  column_to_rownames("name")
 
 classlocko_pct <-
   wtdb %>%
-  {
-    .$Genome <- .$Genome %>% gsub(".fa$", "", .)
-    .
-  } %>%
-  .[.$Genome %in% colnames(genomeko_key), ] %>%
-  {
+  mutate(Genome = gsub(".fa$", "", get("Genome"))) %>%
+  .[.$Genome %in% colnames(genomeko), ] %>%
+  with(
     split(
-      genomeko_key[, .$Genome] %>% t() %>% data.frame(),
-      .$Taxonomy %>% taxon.split(1, 3)
+      genomeko[, get("Genome")] %>% t() %>% data.frame(),
+      get("Taxonomy") %>% taxon.split(1, 3)
     )
-  } %>%
-  lapply(. %>% apply(2, . %>%
-    {
-      sum(. > 0) / length(.)
-    })) %>%
+  ) %>%
+  lapply(
+    . %>% apply(
+      2,
+      . %>%
+        {
+          sum(. > 0) / length(.)
+        }
+    )
+  ) %>%
   bind_rows(.id = "Class") %>%
   column_to_rownames("Class")
 
