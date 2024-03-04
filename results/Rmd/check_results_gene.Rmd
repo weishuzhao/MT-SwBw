@@ -1,13 +1,22 @@
-<!--
- * @Date: 2022-08-13 17:33:57
- * @LastEditors: Hwrn
- * @LastEditTime: 2022-08-19 08:51:18
- * @FilePath: /2021_09-MT10kSW/workflow/others/check_results_gene.Rmd
- * @Description:
--->
-Results
-===
-
+---
+Date: 2022-08-13 17:33:57
+LastEditors: Hwrn hwrn.aou@sjtu.edu.cn
+LastEditTime: 2024-03-04 21:01:32
+FilePath: /2021_09-MT10kSW/results/Rmd/check_results_gene.Rmd
+Description:
+output:
+  html_document:
+    df_print: paged
+    theme: cerulean
+    highlight: haddock
+    toc: yes
+    toc_depth: 3
+    toc_float:
+      collapsed: no
+      smooth_scroll: yes
+    code_fold: hide
+title: Results
+---
 ## Data Import and prepare
 
 ```{r setup, include=FALSE}
@@ -19,36 +28,52 @@ source("workflow/utils/RLib.local/R/init.r", chdir = TRUE)
 ```
 
 ```{r load_data, cache=TRUE, dependson=c("config")}
-Wtdb_abd = stringr::str_glue("Wtdb.relative_abundance.tsv") %>% file_path$file_path$results() %>% as.character
+Wtdb_abd <- stringr::str_glue("Wtdb.relative_abundance.tsv") %>%
+  file_path$file_path$results() %>%
+  as.character()
 
-Stdb = load__Stdb()
-Wtdb = load__Wtdb()
-genome_taxonomy = load__genome_taxonomy(Stdb, Wtdb)
-Wtdb.relative_abundance = get_relative_abundance(Wtdb_abd, genome_taxonomy)
+Stdb <- load__Stdb()
+Wtdb <- load__Wtdb()
+genome_taxonomy <- load__genome_taxonomy(Stdb, Wtdb)
+Wtdb.relative_abundance <- get_relative_abundance(Wtdb_abd, genome_taxonomy)
 
-key_genes = load__key_genes()
-gene_ko_tpm = load__gene_ko_tpm()
-TOTAL_GENE_NUM = gene_ko_tpm$KO %>% unique %>% length %>% {. * 2}
-genomeko = load__genomeko()
+key_genes <- load__key_genes()
+gene_ko_tpm <- load__gene_ko_tpm()
+TOTAL_GENE_NUM <- gene_ko_tpm$KO %>%
+  unique() %>%
+  length() %>%
+  {
+    . * 2
+  }
+genomeko <- load__genomeko()
 ```
 
 ```{r ko_tpm_signif, cache=TRUE, warning=FALSE, dependson=c("load_data")}
-tpm.key =
+tpm.key <-
   gene_ko_tpm %>%
   merge(key_genes, by = "KO") %>%
-  {.$Site = .$Layer %>% gsub("^(.+)\\.\\.(.+)$", "\\1", .); .} %>%
-  {.$Pathway = factor(.$Pathway, levels = levels(key_genes$Pathway)); .} %>%
+  {
+    .$Site <- .$Layer %>% gsub("^(.+)\\.\\.(.+)$", "\\1", .)
+    .
+  } %>%
+  {
+    .$Pathway <- factor(.$Pathway, levels = levels(key_genes$Pathway))
+    .
+  } %>%
   merge(site_group) %>%
-  merge(sample_meta[c("Location", "Group")] %>% unique) %>%
-  {.$Location = factor(.$Location, levels = c("Slope", "Bottom")); .}
+  merge(sample_meta[c("Location", "Group")] %>% unique()) %>%
+  {
+    .$Location <- factor(.$Location, levels = c("Slope", "Bottom"))
+    .
+  }
 
-tpm_key.signif =
+tpm_key.signif <-
   tpm.key %>%
   location.group.signif("KO", "TPM", "Location", "Group", TOTAL_GENE_NUM) %>%
   merge(key_genes, by = "KO") %>%
-  .[.$p.value.char != "-",]
+  .[.$p.value.char != "-", ]
 
-.tpm_key.signif.sum_mean =
+.tpm_key.signif.sum_mean <-
   tpm.key %>%
   group_by(KO, Location, Group, Layer) %>%
   summarise(TPM = sum(TPM)) %>%
@@ -56,63 +81,86 @@ tpm_key.signif =
   summarise(TPM = mean(TPM)) %>%
   {
     merge(.[.$Group %in% c("Sw", "Bw"), ], .[.$Group %in% c("Ss", "Bs"), ],
-          by = c("KO", "Location"),
-          suffixes = c(".w", ".s"))
+      by = c("KO", "Location"),
+      suffixes = c(".w", ".s")
+    )
   } %>%
   merge(tpm_key.signif)
-tpm_key.signif.sum_mean =
+tpm_key.signif.sum_mean <-
   .tpm_key.signif.sum_mean %>%
-  .[.$New == "False",] %>%
+  .[.$New == "False", ] %>%
   .[c("Location", "KO", "Label", "Pathway", "TPM.w", "TPM.s", "p.value.char", "p.value.adj")]
-
 ```
 
 ```{r classlocko_pct, cache=TRUE, dependson=c("load_data")}
-annotation_genomes =
+annotation_genomes <-
   get_taxon_group(Wtdb.relative_abundance, "Genome", "Group") %>%
-  {rownames(.) = .$Genome %>% gsub("^(.+)$", "\\1.fa", .); .$Genome <- NULL; .}
+  {
+    rownames(.) <- .$Genome %>% gsub("^(.+)$", "\\1.fa", .)
+    .$Genome <- NULL
+    .
+  }
 
-genomeko.key =
-  genomeko[key_genes$KO %>% as.character, ] %>%
+genomeko.key <-
+  genomeko[key_genes$KO %>% as.character(), ] %>%
   .[apply(., 1, sum) > 0, apply(., 2, sum) > 0]
 
-get_classlocko_ext <- function(Pathway = c(), Label = c(), New = c("False"), Class = c()) {
-  annotation_genomes_class =
+get_classlocko_ext <- function(
+    Pathway = c(), Label = c(), New = c("False"), Class = c()) {
+  annotation_genomes_class <-
     merge(Wtdb[c("Genome", "Classification")], annotation_genomes,
-          by.x = "Genome", by.y = 0) %>%
+      by.x = "Genome", by.y = 0
+    ) %>%
+    mutate(
+      Class = get("Classification") %>% taxon.split(1, 3),
+      Classification = get("Classification") %>% taxon.split(1, 7),
+      Genome = gsub(".fa$", "", get("Genome")),
+      Row.names = NULL
+    ) %>%
     {
-      Classification = .$Classification
-      .$Class = Classification %>% taxon.split(1, 3)
-      .[c("Row.names", "Classification")] <- NULL
-      .$Classification = Classification %>% taxon.split(1, 7)
-      .
-    } %>%
-    {
-      if (length(Class) == 0) .[,] else .[.$Class %in% Class,]
+      if (length(Class) == 0) .[, ] else .[.$Class %in% Class, ]
     }
 
   key_genes %>%
     {
-      if (length(New) == 0) .[,] else .[.$New %in% New,]
+      if (length(New) == 0) .[, ] else .[.$New %in% New, ]
     } %>%
     {
-      if (length(Pathway) == 0) .[,] else .[.$Pathway %in% Pathway,]
+      if (length(Pathway) == 0) .[, ] else .[.$Pathway %in% Pathway, ]
     } %>%
     {
-      if (length(Label) == 0) .[,] else .[.$Label %in% Label,]
+      if (length(Label) == 0) .[, ] else .[.$Label %in% Label, ]
     } %>%
-    {data.frame(t(genomeko.key))[annotation_genomes_class$Genome, ][.$KO]} %>%
-    {.$Psudo <- 0; .} %>% .[apply(., 1, max) > 0, ] %>%
-    {.$Psudo <- 1; .} %>% .[, apply(., 2, max) > 0] %>% {.$Psudo <- NULL; .} %>%
     {
-      colnames(.) =
-        colnames(.) %>% sapply(. %>% {as.character(key_genes$Label)[which(. == key_genes$KO)]})
+      data.frame(t(genomeko.key))[annotation_genomes_class$Genome, ][.$KO]
+    } %>%
+    {
+      .$Psudo <- 0
       .
     } %>%
+    .[apply(., 1, max) > 0, ] %>%
+    {
+      .$Psudo <- 1
+      .
+    } %>%
+    .[, apply(., 2, max) > 0] %>%
+    {
+      .$Psudo <- NULL
+      .
+    } %>%
+    `colnames<-`(
+      colnames(.) %>%
+        sapply(
+          . %>%
+            {
+              as.character(key_genes$Label)[which(. == key_genes$KO)]
+            }
+        )
+    ) %>%
     merge(annotation_genomes_class, by.x = 0, by.y = "Genome") %>%
-    .[.$Classification %>% order,] %>%
-    {.[c("Row.names")] <- NULL; .} %>%
-    {rownames(.) <- NULL; .}
+    .[.$Classification %>% order(), ] %>%
+    mutate(Row.names = NULL) %>%
+    `rownames<-`(NULL)
 }
 ```
 
@@ -126,7 +174,7 @@ get_classlocko_ext <- function(Pathway = c(), Label = c(), New = c("False"), Cla
 
 ```{r dependson=c("config")}
 get_classlocko_ext(Pathway = c("3HP-4HB"))
-tpm_key.signif.sum_mean %>% .[.$Pathway == "3HP-4HB",]
+tpm_key.signif.sum_mean %>% .[.$Pathway == "3HP-4HB", ]
 ```
 
 - Key genes of 3PH-4HB pathway (3hpcs, 4hbcl) are only obtained in `r unique(get_classlocko_ext(Label = c("3hpcs", "4hbcl"))$Class)`, which is widespread across MT.
@@ -135,7 +183,7 @@ tpm_key.signif.sum_mean %>% .[.$Pathway == "3HP-4HB",]
 
 ```{r dependson=c("config")}
 get_classlocko_ext(Pathway = c("rTCA"))
-tpm_key.signif.sum_mean %>% .[.$Pathway == "rTCA",]
+tpm_key.signif.sum_mean %>% .[.$Pathway == "rTCA", ]
 ```
 
 - Key genes of rTCA (aclA, ccsA) mostly found in Nitrospinia of Nitrospinota, while aclA is only find in Nitrospiria in water environments. this indicates a important role of carbon fixation of Nitrospinia in the sediment, and the intercellular cooperation for rTCA cycling in the water.
@@ -146,7 +194,7 @@ tpm_key.signif.sum_mean %>% .[.$Pathway == "rTCA",]
 
 ```{r dependson=c("config")}
 get_classlocko_ext(Label = c("prkB", "cbbL", "cbbS"), New = c())
-.tpm_key.signif.sum_mean %>% .[.$Label %in% c("prkB", "cbbL", "cbbS"),]
+.tpm_key.signif.sum_mean %>% .[.$Label %in% c("prkB", "cbbL", "cbbS"), ]
 ```
 
 - On the contrary, key genes in CBB pathway (prkB) is abundant, and shared in various strains, mainly in Gammaproteobacteria.
@@ -158,7 +206,7 @@ get_classlocko_ext(Label = c("prkB", "cbbL", "cbbS"), New = c())
     因此在这里关注了深渊中难降解有机质的降解能力
 
 ```{r dependson=c("config")}
-tpm_key.signif.sum_mean %>% .[.$Pathway == "Alkane",]
+tpm_key.signif.sum_mean %>% .[.$Pathway == "Alkane", ]
 get_classlocko_ext(Label = c("alkM"), New = c())
 get_classlocko_ext(Label = c("ladA", "luxA"))
 ```
@@ -171,7 +219,7 @@ get_classlocko_ext(Label = c("ladA", "luxA"))
 
 
 ```{r dependson=c("config")}
-tpm_key.signif.sum_mean %>% .[.$Pathway == "Plastic degradation",]
+tpm_key.signif.sum_mean %>% .[.$Pathway == "Plastic degradation", ]
 get_classlocko_ext(Pathway = "Plastic degradation", New = c())
 ```
 - > 许多与塑料降解相关的基因的丰度均较高, 尤其在沟底富集
@@ -182,12 +230,14 @@ get_classlocko_ext(Pathway = "Plastic degradation", New = c())
 
 
 ```{r dependson=c("config")}
-tpm_key.signif.sum_mean %>% .[.$Pathway == "Aromatic",]
-get_classlocko_ext(Pathway = c("Aromatic"), Class = c("Archaea;Nanoarchaeota;Nanoarchaeia",
-                                                      "Archaea;Thermoplasmatota;Poseidoniia_A",
-                                                      "Archaea;Thermoproteota;Nitrososphaeria"))
-#tpm_key.signif.sum_mean %>% .[.$Label %in% c("boxB", "hcrA"), ]
-#get_classlocko_ext(Label = c("boxB", "hcrA"))
+tpm_key.signif.sum_mean %>% .[.$Pathway == "Aromatic", ]
+get_classlocko_ext(Pathway = c("Aromatic"), Class = c(
+  "Archaea;Nanoarchaeota;Nanoarchaeia",
+  "Archaea;Thermoplasmatota;Poseidoniia_A",
+  "Archaea;Thermoproteota;Nitrososphaeria"
+))
+# tpm_key.signif.sum_mean %>% .[.$Label %in% c("boxB", "hcrA"), ]
+# get_classlocko_ext(Label = c("boxB", "hcrA"))
 ```
 
 - 8 Archaea in this study obtained the potential to utilize aromatic components.
@@ -203,10 +253,10 @@ get_classlocko_ext(Pathway = c("Aromatic"), Class = c("Archaea;Nanoarchaeota;Nan
     indicating a functional differentiation and nutrient difference between environment.
 
 ```{r dependson=c("config")}
-tpm_key.signif.sum_mean %>% .[.$Pathway == "Complex sugar",]
+tpm_key.signif.sum_mean %>% .[.$Pathway == "Complex sugar", ]
 get_classlocko_ext(Pathway = "Complex sugar")
-#get_classlocko_ext(Label = c("chi"))
-#get_classlocko_ext(Label = c("pulA"))
+# get_classlocko_ext(Label = c("chi"))
+# get_classlocko_ext(Label = c("pulA"))
 ```
 
 - Key genes of complex sugar is more abundant in water,
@@ -214,10 +264,10 @@ get_classlocko_ext(Pathway = "Complex sugar")
     - > 沟底淀粉降解? 是否与沉降速度快有关?
 
 ```{r dependson=c("config")}
-tpm_key.signif.sum_mean %>% .[.$Pathway == "D-AA",]
+tpm_key.signif.sum_mean %>% .[.$Pathway == "D-AA", ]
 get_classlocko_ext(Pathway = "D-AA")
 
-tpm_key.signif.sum_mean %>% .[.$Pathway == "L-sugar",]
+tpm_key.signif.sum_mean %>% .[.$Pathway == "L-sugar", ]
 get_classlocko_ext(Pathway = "L-sugar")
 ```
 
@@ -233,9 +283,9 @@ get_classlocko_ext(Pathway = "L-sugar")
 - 同化型硫酸盐还原为亚硫酸盐在各个环境中差异不大, 而在沟底水样中最丰富
 - 异化型硫酸盐还原为亚硫酸盐主要是在沉积物和坡上的水样中丰度较高
 ```{r dependson=c("config")}
-tpm_key.signif.sum_mean %>% .[.$Label %in% c("cysNC", "cysD", "cysC", "cysH"),]
+tpm_key.signif.sum_mean %>% .[.$Label %in% c("cysNC", "cysD", "cysC", "cysH"), ]
 get_classlocko_ext(Label = c("cysNC", "cysD", "cysC", "cysH"))
-tpm_key.signif.sum_mean %>% .[.$Label %in% c("sat", "aprA"),]
+tpm_key.signif.sum_mean %>% .[.$Label %in% c("sat", "aprA"), ]
 get_classlocko_ext(Label = c("sat", "aprA"))
 ```
 
@@ -246,14 +296,14 @@ get_classlocko_ext(Label = c("sat", "aprA"))
     sir 在非沟底水体中具有较高丰度,
 - 异化型亚硫酸盐还原为硫化氢关键基因 dsrA 主要在沟底沉积物中
 ```{r dependson=c("config")}
-tpm_key.signif.sum_mean %>% .[.$Label %in% c("cysJ", "cysI", "sir", "dsrA"),]
+tpm_key.signif.sum_mean %>% .[.$Label %in% c("cysJ", "cysI", "sir", "dsrA"), ]
 get_classlocko_ext(Label = c("sat", "aprA"))
 ```
 
 #### SOX system
 - 硫代硫酸盐氧化能力在沟底水样中相对较低
 ```{r dependson=c("config")}
-tpm_key.signif.sum_mean %>% .[.$Label %in% c("soxA", "soxC", "soxY"),]
+tpm_key.signif.sum_mean %>% .[.$Label %in% c("soxA", "soxC", "soxY"), ]
 get_classlocko_ext(Label = c("sat", "aprA"))
 ```
 
@@ -261,7 +311,7 @@ get_classlocko_ext(Label = c("sat", "aprA"))
 - 硫化氢利用相关的基因 (cysK) 在沟底非常丰富,
     相关类群包括各种古菌和细菌 (能否暗示活跃的碳固定过程?)
 ```{r dependson=c("config")}
-tpm_key.signif.sum_mean %>% .[.$Label %in% c("cysK", "glpE", "phsA", "sqr"),]
+tpm_key.signif.sum_mean %>% .[.$Label %in% c("cysK", "glpE", "phsA", "sqr"), ]
 get_classlocko_ext(Label = c("cysK"))
 ```
 
@@ -271,34 +321,34 @@ get_classlocko_ext(Label = c("cysK"))
 - arsA 在沟底较多, arsB, arsM 在其他环境中较多 (可能沟底水体中 As 含量较低, 沉积物中有较多砷?)
 - aoxA 丰度很低
 ```{r dependson=c("config")}
-tpm_key.signif.sum_mean %>% .[.$Label %in% c("arsC1", "arsC2", "arsC3"),]
-tpm_key.signif.sum_mean %>% .[.$Label %in% c("arsA", "arsB", "arsM"),]
-tpm_key.signif.sum_mean %>% .[.$Label %in% c("aoxA"),]
+tpm_key.signif.sum_mean %>% .[.$Label %in% c("arsC1", "arsC2", "arsC3"), ]
+tpm_key.signif.sum_mean %>% .[.$Label %in% c("arsA", "arsB", "arsM"), ]
+tpm_key.signif.sum_mean %>% .[.$Label %in% c("aoxA"), ]
 ```
 
 - selD (selenide, water dikinase) 在各个环境中都比较丰富
 - selA (L-seryl-tRNA(Ser) seleniumtransferase) 在各个环境中也比较丰富, 但在沟底水样中稍少
 - selU (tRNA 2-selenouridine synthase) 主要在沟底水样比较丰富, 在 Gammaproteobacteria 较多
 ```{r dependson=c("config")}
-tpm_key.signif.sum_mean %>% .[.$Pathway == "Se",]
+tpm_key.signif.sum_mean %>% .[.$Pathway == "Se", ]
 get_classlocko_ext(Label = "selU")
 ```
 
 - 各个参与 ROS 的基因丰度都较高,
     - katE 和 sod1 在沟底水样中的丰度明显高于其在其他环境中的丰度, 在坡上水样中的丰度最低
 ```{r dependson=c("config")}
-tpm_key.signif.sum_mean %>% .[.$Pathway == "ROS",]
+tpm_key.signif.sum_mean %>% .[.$Pathway == "ROS", ]
 ```
 
 ```{r dependson=c("config")}
-tpm_key.signif.sum_mean %>% .[.$Pathway == "Glycine betaine",]
+tpm_key.signif.sum_mean %>% .[.$Pathway == "Glycine betaine", ]
 ```
 
 - tmm 在坡上水样中最多, 而在沟底水样中最少
 - torZ 主要在水样中
 - 没有 MAG 同时具有这两个基因
 ```{r dependson=c("config")}
-tpm_key.signif.sum_mean %>% .[.$Pathway == "TMAO",]
+tpm_key.signif.sum_mean %>% .[.$Pathway == "TMAO", ]
 get_classlocko_ext(Label = "tmm")
 get_classlocko_ext(Label = "torZ")
 ```
@@ -306,6 +356,6 @@ get_classlocko_ext(Label = "torZ")
 - DMSP 主要在 Rhodobacteraceae 中发现, 丰度较低,
     dmnD 主要在水样中, dddL 在沉积物中稍高
 ```{r dependson=c("config")}
-tpm_key.signif.sum_mean %>% .[.$Pathway == "DMSP",]
+tpm_key.signif.sum_mean %>% .[.$Pathway == "DMSP", ]
 get_classlocko_ext(Pathway = "DMSP")
 ```
