@@ -1,0 +1,262 @@
+
+---
+Date: 2024-02-19 14:11:51
+LastEditors: Hwrn hwrn.aou@sjtu.edu.cn
+LastEditTime: 2024-02-27 10:58:33
+FilePath: /2021_09-MT10kSW/results/Rmd/check_niche_neu.Rmd
+output:
+  html_document:
+    df_print: paged
+    theme: cerulean
+    highlight: haddock
+    toc: yes
+    toc_depth: 3
+    toc_float:
+      collapsed: no
+      smooth_scroll: yes
+    code_fold: hide
+title: MAG co-occurence pattern using randomForest
+---
+
+```{r setup, include=FALSE}
+knitr::opts_knit$set(root.dir = "~/Work/2021_09-MT10kSW/")
+```
+
+```{r config, message=FALSE, warning=FALSE}
+source("workflow/utils/RLib.local/R/init.r", chdir = TRUE)
+```
+
+```{r load_data, cache=TRUE, dependson=c("config")}
+taxon_color <- load__taxon_color()
+
+stdb <- load__Stdb()
+wtdb <- load__Wtdb()
+genome_taxonomy <- load__genome_taxonomy(stdb, wtdb)
+
+genome_rltabd <-
+  stringr::str_glue("Wtdb.relative_abundance.tsv") %>%
+  file_path$file_path$results(.) %>%
+  as.character() %>%
+  get_relative_abundance(genome_taxonomy) %>%
+  mutate(
+    Taxa_label = sapply(taxon.split(get("Taxonomy"), 1, 7), get_taxon_color)
+  )
+
+genomeko <- load__genomeko()
+gmodule <- file_path$file_path$results("gmodule.csv") %>%
+  as.character() %>%
+  load_gmodule(symnum = FALSE) %>%
+  `colnames<-`(colnames(.) %>% gsub(".fa", "", .))
+#' gene_ko_tpm <- load__gene_ko_tpm()
+
+key_genes <- load__key_genes()
+pathway_col <- set__pathway_col(key_genes$Pathway)
+```
+
+## test neuralnet
+```{r do estimation}
+genome_group_otu <- genome_rltabd %>%
+  {
+    abd <- .
+    otus <- unique(abd$Genome)
+    otu_annot <- get_taxon_group(abd, "Genome")
+    otu_raw <- cbind(t(genomeko[as.character(key_genes$KO), otus]))
+    # , t(gmodule[, otus]))
+
+    l <- abd$Group %>%
+      unique() %>%
+      `names<-`(., .) %>%
+      lapply(
+        . %>%
+          {
+            groups <- filter(otu_annot, get(.) != "")$Genome
+            otu_raw %>%
+              data.frame(groups = (rownames(.) %in% groups), .)
+          }
+      )
+  }
+
+genome_group_nts <- site_group$Group %>%
+  unique() %>%
+  `names<-`(., .) %>%
+  lapply(
+    . %>%
+      {
+        otu_group <- genome_group_otu[[.]]
+        set.seed(1)
+
+        select_train <- dim(otu_group)[1] %>% sample(. * 0.8)
+        otu_train <- otu_group
+      } %>%
+      neuralnet::neuralnet(
+        formula("groups ~ ."),
+        data = .,
+        hidden = 10, #' c(50, 10),
+        err.fct = "ce", linear.output = FALSE,
+        threshold = 0.0001
+      )
+  )
+
+site_group$Group %>%
+  unique() %>%
+  sapply(
+    . %>%
+      {
+        print(.)
+        otu_group <- genome_group_otu[[.]]
+        otu_test <- genome_group_otu[[.]] %>%
+          rownames_to_column("Genome") %>%
+          left_join(genome_taxonomy[c("Genome", "Cluster")]) %>%
+          .[c("Cluster", "groups")] %>%
+          inner_join(
+            genome_taxonomy %>% .[!.$Rep, c("Genome", "Cluster")]
+          ) %>%
+          .[c("Genome", "groups")] %>%
+          column_to_rownames("Genome") %>%
+          cbind(t(genomeko[, rownames(.)])) # , t(gmodule[, rownames(.)]))
+
+        genome_group_nts[[.]] %>%
+          {
+            predicted <- .$net.result[[1]][, 1] > 0.5
+            otu_train <- otu_group
+
+            print(table(otu_train$groups, predicted))
+            pred <- predict(., otu_test) > 0.5
+            print(table(otu_test$groups, pred))
+            print(
+              paste(
+                "测试的准确率:",
+                sum(otu_test$groups == pred) / length(pred)
+              )
+            )
+          }
+      }
+  )
+```
+
+```{r n important factors, fig.width=14, fig.height=10}
+genome_group_nts$Sw %>%
+  {
+    .$result.matrix %>%
+      .[grepl(".to.1layhid", rownames(.)), ] %>%
+      data.frame(
+        Weight = .,
+        Factor = gsub("^(.+)\\.to\\.1layhid(.+)$", "\\1", names(.)),
+        Layhid = gsub("^(.+)\\.to\\.1layhid(.+)$", "N\\2", names(.))
+      )
+  } %>%
+  pivot_wider(
+    id_cols = "Factor", names_from = "Layhid", values_from = "Weight"
+  ) %>%
+  column_to_rownames("Factor")
+# OTUs
+genome_group_nts %>%
+  lapply(
+    . %>%
+      {
+        net <- .
+        `names<-`(seq_along(.$model.list$variables), .$model.list$variables) %>%
+          sapply(
+            . %>%
+              {
+                covariate <- as.vector(net$covariate[, .])
+                matrix <- net$generalized.weights[[1]][, .]
+                matrix[is.na(matrix)] <- 0
+                #' plot(x = covariate, y = matrix, xlab = variablename, ylab = "GW") # nolint: line_length_linter.
+                #' title(paste("Response: ", .$model.list$response[1], sep = "")) # nolint: line_length_linter.
+                c(
+                  ne = sum((covariate == 0) * (matrix <= 0.001)),
+                  na = sum((covariate == 0) * (matrix > 0.001)),
+                  he = sum((covariate > 0) * (matrix <= 0.001)),
+                  ha = sum((covariate > 0) * (matrix > 0.001))
+                )
+              }
+          )
+      } %>%
+      t() %>%
+      # .[.[, "ha"] != 0, ] %>%
+      as.data.frame() %>%
+      rownames_to_column("KO")
+  ) %>%
+  bind_rows(.id = "Group") %>%
+  pivot_wider(id_cols = "KO", names_from = "Group", values_from = "ha") %>%
+  inner_join(key_genes) %>%
+  dplyr::arrange(-(get("Sw") + get("Ss") + get("Bw") + get("Bs")))
+```
+
+```{r check select vars, fig.width=10, fig.height=7}
+gko_table <- function(ko, gt) {
+  summary_table <- genome_group_otu %>% # nolint: object_usage_linter.
+    lapply(
+      . %>% # nolint: object_usage_linter.
+        .[rownames(.) %in% gt$Genome, ] %>%
+        with(table(get("groups"), get(ko)))
+    )
+  summary_table$KO <- genomeko %>% # nolint: object_usage_linter.
+    .[, .[ko, ] != 0] %>% # nolint: object_usage_linter.
+    colnames() %>%
+    {
+      g_with_ko <- . # nolint: object_usage_linter.
+      gt %>% # nolint: object_usage_linter.
+        filter(get("Rep")) %>%
+        with(
+          table(
+            taxon.split(get("Taxonomy"), 1, 3), # nolint: object_usage_linter.
+            get("Genome") %in% g_with_ko
+          )
+        )
+    }
+  summary_table
+}
+```
+
+```{r}
+gko_table(
+  ko = "K00368",
+  gt = genome_taxonomy %>%
+    mutate(Taxon = taxon.split(get("Taxonomy"), 1, 3)) %>%
+    filter(
+      get("Taxon") == "Bacteria;Bacteroidota;Bacteroidia" |
+        get("Taxon") == "Bacteria;Proteobacteria;Alphaproteobacteria" |
+        get("Taxon") == "Bacteria;Proteobacteria;Gammaproteobacteria"
+    )
+)
+gko_table(
+  ko = "K00368",
+  gt = genome_taxonomy %>%
+    mutate(Taxon = taxon.split(get("Taxonomy"), 1, 3)) %>%
+    filter(
+      get("Taxon") != "Bacteria;Bacteroidota;Bacteroidia" &
+        get("Taxon") != "Bacteria;Proteobacteria;Alphaproteobacteria" &
+        get("Taxon") != "Bacteria;Proteobacteria;Gammaproteobacteria"
+    )
+)
+```
+
+```{r}
+gko_table(
+  ko = "K00605",
+  gt = genome_taxonomy %>%
+    mutate(Taxon = taxon.split(get("Taxonomy"), 1, 3)) %>%
+    filter(
+      get("Taxon") == "Bacteria;Bacteroidota;Bacteroidia" |
+        get("Taxon") == "Bacteria;Proteobacteria;Alphaproteobacteria" |
+        get("Taxon") == "Bacteria;Proteobacteria;Gammaproteobacteria"
+    )
+)
+gko_table(
+  ko = "K00605",
+  gt = genome_taxonomy %>%
+    mutate(Taxon = taxon.split(get("Taxonomy"), 1, 3)) %>%
+    filter(
+      get("Taxon") != "Bacteria;Bacteroidota;Bacteroidia" &
+        get("Taxon") != "Bacteria;Proteobacteria;Alphaproteobacteria" &
+        get("Taxon") != "Bacteria;Proteobacteria;Gammaproteobacteria"
+    )
+)
+```
+
+- `K00605` 基因是因为
+  在 Bacteroidia, Alphaproteobacteria, 和 Gammaproteobacteria 中更常见
+  而这几个类群又多在 Bs 中出现,
+  才导致 `K00605` 看上去有较好的预测性
