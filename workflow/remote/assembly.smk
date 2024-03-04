@@ -7,12 +7,18 @@ MIN_CONTIG_LEN = 500
 
 rule assembly_megahit:
     input:
-        r1s = lambda _: [file_path.trimmed_reads(_.site, layer, 1) for layer in site_layer_dict[_.site]],
-        r2s = lambda _: [file_path.trimmed_reads(_.site, layer, 2) for layer in site_layer_dict[_.site]],
+        r1s=lambda _: [
+            file_path.trimmed_reads(_.site, layer, 1)
+            for layer in site_layer_dict[_.site]
+        ],
+        r2s=lambda _: [
+            file_path.trimmed_reads(_.site, layer, 2)
+            for layer in site_layer_dict[_.site]
+        ],
     output:
-        contig = protected(contig_raw),
+        contig=protected(contig_raw),
     params:
-        outdir = file_path.contig("{site}", "..megahit", "-dir"),
+        outdir=file_path.contig("{site}", "..megahit", "-dir"),
     log:
         file_path.log("02_assem_megahit", "{site}"),
     threads: THREADS
@@ -38,26 +44,27 @@ rule assembly_megahit:
 
 rule assembly_rename_cut:
     input:
-        contig = contig_raw
+        contig=contig_raw,
     output:
-        contig = contig
+        contig=contig,
     params:
-        site = "{site}"
+        site="{site}",
     run:
         from utils.contig_rename_cut import rename_cut
+
         with open(input.contig) as fi, open(output.contig, "w") as fo:
             rename_cut(fi, fo, MIN_CONTIG_LEN, params.site)
 
 
 rule map_bbmap:
     input:
-        r1 = str(file_path.trimmed_reads("{site}", "{layer}", 1)),
-        r2 = str(file_path.trimmed_reads("{site}", "{layer}", 2)),
-        contig = contig,
+        r1=str(file_path.trimmed_reads("{site}", "{layer}", 1)),
+        r2=str(file_path.trimmed_reads("{site}", "{layer}", 2)),
+        contig=contig,
     output:
-        bbdepth = file_path.bam("{site}", "{layer}", "-bbmap.depth"),
-        bam     = protected(file_path.bam("{site}", "{layer}")),
-        bai     = protected(file_path.bam("{site}", "{layer}", ".bam.bai")),
+        bbdepth=file_path.bam("{site}", "{layer}", "-bbmap.depth"),
+        bam=protected(file_path.bam("{site}", "{layer}")),
+        bai=protected(file_path.bam("{site}", "{layer}", ".bam.bai")),
     threads: THREADS
     log:
         file_path.log("02_assem_map_bbmap", "{site}", "{layer}"),
@@ -91,9 +98,11 @@ rule map_bbmap:
 
 rule depth_jgi:
     input:
-        bams = lambda _: [file_path.bam(_.site, layer) for layer in site_layer_dict[_.site]],
+        bams=lambda _: [
+            file_path.bam(_.site, layer) for layer in site_layer_dict[_.site]
+        ],
     output:
-        jgi = jgi
+        jgi=jgi,
     log:
         file_path.log("02_assem_depth_jgi", "{site}"),
     shell:
@@ -111,11 +120,11 @@ rule depth_jgi:
 
 rule plass:
     input:
-        r1 = "pipe/{sample}/01_trim..{sample}_1.fq.gz",
-        r2 = "pipe/{sample}/01_trim..{sample}_2.fq.gz",
+        r1="pipe/{sample}/01_trim..{sample}_1.fq.gz",
+        r2="pipe/{sample}/01_trim..{sample}_2.fq.gz",
     output:
-        out = "pipe/{sample}/02_assem..{sample}.prot.fa",
-    threads: THREADS-1
+        out="pipe/{sample}/02_assem..{sample}.prot.fa",
+    threads: THREADS - 1
     shell:
         """
         source ~/.conda_init
