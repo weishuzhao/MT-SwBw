@@ -1,7 +1,7 @@
 ---
 Date: 2022-07-31 20:51:00
 LastEditors: Hwrn hwrn.aou@sjtu.edu.cn
-LastEditTime: 2024-03-04 21:02:48
+LastEditTime: 2024-03-05 13:20:49
 FilePath: /2021_09-MT10kSW/results/Rmd/check_ko_tpm_clade_N.Rmd
 Description:
 output:
@@ -28,60 +28,60 @@ options(width = 120)
 source("workflow/utils/RLib.local/R/init.r", chdir = TRUE)
 ```
 
-```{r load_data, cache=TRUE, dependson=c("config")}
+```{r load_data}
 stdb <- load__Stdb()
 wtdb <- load__Wtdb()
 genome_taxonomy <- load__genome_taxonomy(load__Stdb(), load__Wtdb())
 
 genome_rltabd <- stringr::str_glue("Wtdb.relative_abundance.tsv") %>%
-  file_path$file_path$results() %>%
+  file_path$file_path$results(.) %>%
   as.character() %>%
   get_relative_abundance(genome_taxonomy)
 
-taxon_color <- load__taxon_color()
-
 key_genes <- load__key_genes()
-key_genes_N <- # nolint: object_name_linter.
-  key_genes %>%
+key_genes_N <- key_genes %>% # nolint: object_name_linter.
   filter(get("Pathway") == "N") %>%
   mutate(Pathway = get("Arrow") %>% factor(levels = unique(.)))
 
-gene_ko_tpm_N <- # nolint: object_name_linter.
-  load__gene_ko_tpm() %>%
-  .[.$KO %in% key_genes_N$KO, ]
-genomeko_N <- # nolint: object_name_linter.
-  load__genomeko() %>%
-  .[
-    rownames(.) %>% .[. %in% key_genes_N$KO],
-  ] %>%
-  .[apply(., 1, sum) > 0, apply(., 2, sum) > 0]
+key_genes_aoa <- data.frame(
+  KO = c(
+    as.character(key_genes_N$KO),
+    "K03182", "K03741", "K03892", "K00657", "K07086"
+  ) %>% factor(., levels = .),
+  Label = c(
+    as.character(key_genes_N$Label),
+    "ubiE", "arsC2", "arsR", "sepG", "K07086"
+  ) %>% factor(., levels = .)
+)
+
+gene_ko_tpm_N <- load__gene_ko_tpm() %>% # nolint: object_name_linter.
+  .[.$KO %in% key_genes_aoa$KO, ]
 ```
 
-```{r genome_group, dependson=c("config", "load_data"), warning=FALSE}
-genome_ext <-
-  genome_rltabd %>%
-  {
+```{r genome_group}
+genome_ext <- genome_rltabd %>%
+  with(
     data.frame(
-      "Genome" = .$Genome,
-      "Class" = .$Taxonomy %>% taxon.split(1, 3),
-      "Taxonomy" = .$Taxonomy %>% taxon.split(1, 7),
-      "Layer" = .$Layer, "Group" = .$Group,
-      "Exist" = TRUE
+      Genome = get("Genome"),
+      Class = taxon.split(get("Taxonomy"), 1, 3),
+      Taxonomy = taxon.split(get("Taxonomy"), 1, 7),
+      Layer = get("Layer"),
+      Group = get("Group"),
+      Exist = TRUE
     )
-  }
-key_gene_genome_layer <-
-  gene_ko_tpm_N %>%
+  )
+key_gene_genome_layer <- gene_ko_tpm_N %>%
   mutate(Genome = gsub(".fa$", "", get("Genome"))) %>%
   merge(genome_taxonomy[c("Cluster", "Genome")]) %>%
   mutate(Genome = NULL) %>%
   merge(
     genome_taxonomy[c("Cluster", "Genome", "Rep")] %>% .[.$Rep, ]
   ) %>%
-  group_by(KO, Layer, Genome) %>%
-  summarise(TPM = sum(TPM)) %>%
+  group_by(KO = get("KO"), Layer = get("Layer"), Genome = get("Genome")) %>%
+  summarise(GPM = sum(get("TPM"))) %>%
   merge(unique(genome_ext[c("Layer", "Group")])) %>%
   merge(genome_ext[c("Genome", "Layer", "Exist")], all.x = TRUE) %>%
-  mutate(TPM.adj = get("TPM") * (1 - 2 * is.na(get("Exist"))))
+  mutate(GPM.adj = get("GPM") * (1 - 2 * is.na(get("Exist"))))
 ```
 
 ```{r tree function}
@@ -239,10 +239,7 @@ plot_gene_tree <- function(
 ### amoABC | Ammonia -> Hydroxylamine
 ```{r fig.height=15, fig.width=3.5}
 p1 <- genome_rltabd %>%
-  filter(
-    taxon.split(get("Taxonomy"), 1, 3) ==
-      "Archaea;Thermoproteota;Nitrososphaeria"
-  ) %>%
+  filter(taxon.split(get("Taxonomy"), 3) == "Nitrososphaeria") %>%
   mutate(Genus = as.character(taxon.split(get("Taxonomy"), 6))) %>%
   ggplot() +
   geom_boxplot(
@@ -273,11 +270,11 @@ key_gene_genome_layer %>%
   mutate(Genus = as.character(taxon.split(get("Taxonomy"), 6))) %>%
   ggplot() +
   geom_boxplot(
-    aes_string(x = "Group", y = "TPM", fill = "Group"),
+    aes_string(x = "Group", y = "GPM", fill = "Group"),
     data = . %>% filter(!is.na(get("Exist")))
   ) +
   geom_boxplot(
-    aes_string(x = "Group", y = "TPM", color = "Exist"),
+    aes_string(x = "Group", y = "GPM", color = "Exist"),
     data = . %>%
       group_by(
         Genome = get("Genome"),
@@ -300,6 +297,39 @@ key_gene_genome_layer %>%
   plot_layout(
     design = paste(c(rep("A", 12), "B"), collapse = ""), guides = "collect"
   )
+```
+
+```{r fig.height=15, fig.width=16}
+genome_taxonomy[c("Genome", "Cluster", "Taxonomy")] %>%
+  filter(taxon.split(get("Taxonomy"), 3) == "Nitrososphaeria") %>%
+  inner_join(key_gene_genome_layer, .) %>%
+  left_join(key_genes_aoa) %>%
+  mutate(
+    Genus = as.character(taxon.split(get("Taxonomy"), 6)),
+    Label = factor(get("Label"), levels(key_genes_aoa$Label))
+  ) %>%
+  ggplot() +
+  geom_boxplot(
+    aes_string(x = "Group", y = "GPM", fill = "Group"),
+    data = . %>% filter(!is.na(get("Exist")))
+  ) +
+  scale_y_log10(
+    labels = ~ format(.x, scientific = TRUE) %>%
+      str_replace("^0e\\+0", "0e+0") %>%
+      str_replace("e\\+0", "%*%10^") %>%
+      parse(text = .)
+  ) +
+  facet_grid(formula("Cluster ~ Label + KO")) +
+  scale_fill_manual(values = sample_meta_col) +
+  p1 +
+  plot_layout(
+    design = paste(c(rep("A", 14), "B"), collapse = ""), guides = "collect"
+  ) &
+  theme_bw() +
+    theme(
+      axis.text.x = element_blank(),
+      axis.ticks.x = element_blank()
+    )
 ```
 
 ```{r amoA all, fig.height=15, fig.width=16}
@@ -398,7 +428,7 @@ gene_tree_ureC_rep %>%
   plot_gene_tree(title = "Rep ureC genes", tree_x_lim = 13, phydata_offset = 10)
 ```
 
-```{r gdhA, fig.height=15, fig.width=30}
+```{r amoA-amoB, fig.height=15, fig.width=30}
 cop <- list(amoA = gene_tree_amoA, amoB = gene_tree_amoB) %>%
   lapply(
     . %>%
@@ -456,7 +486,7 @@ genome_tree <- "04_bin/04_tree/all_mid_20.afa.trimal.contree" %>%
   }
 ```
 
-```{r compare genome and amoA, fig.height=7, fig.width=8}
+```{r compare genome, fig.height=7, fig.width=8}
 genome_tree %>%
   ape::keep.tip(
     .,
@@ -490,7 +520,7 @@ genome_tree %>%
   }
 ```
 
-```{r compare genome and amoA, fig.height=15, fig.width=27}
+```{r compare genome and amoAB, fig.height=15, fig.width=27}
 compare_tree_gene_genome <- function(
     gene_tree, genome_tree, gene_name = "") {
   gene_tree1 <- gene_tree %>% # nolint: object_usage_linter.
@@ -568,8 +598,8 @@ key_gene_genome_layer %>%
     Group = get("Group")
   ) %>%
   summarise(
-    gdhA_per_amoA = c(get("TPM")[which(get("Label") == "gdhA")], 0)[1] /
-      c(get("TPM")[which(get("Label") == "amoA")], -1)[1]
+    gdhA_per_amoA = c(get("GPM")[which(get("Label") == "gdhA")], 0)[1] /
+      c(get("GPM")[which(get("Label") == "amoA")], -1)[1]
   ) %>%
   filter(get("gdhA_per_amoA") > 0) %>%
   print() %>%
@@ -599,12 +629,12 @@ load__gene_ko_tpm() %>%
   ) %>%
   summarise(
     k141_1895267_per_amoA = c(
-      c(get("TPM")[which(get("KO") == "K00261")], 0)[1] /
-        c(get("TPM")[which(get("KO") == "K10944")], -1)[1],
-      c(get("TPM")[which(get("KO") == "K03183")], 0)[1] /
-        c(get("TPM")[which(get("KO") == "K10944")], -1)[1],
-      c(get("TPM")[which(get("KO") == "K03432")], 0)[1] /
-        c(get("TPM")[which(get("KO") == "K10944")], -1)[1]
+      c(get("GPM")[which(get("KO") == "K00261")], 0)[1] /
+        c(get("GPM")[which(get("KO") == "K10944")], -1)[1],
+      c(get("GPM")[which(get("KO") == "K03183")], 0)[1] /
+        c(get("GPM")[which(get("KO") == "K10944")], -1)[1],
+      c(get("GPM")[which(get("KO") == "K03432")], 0)[1] /
+        c(get("GPM")[which(get("KO") == "K10944")], -1)[1]
     ),
     k141_1895267_genes = c("K00261", "K03183", "K03432")
   ) %>%
@@ -748,7 +778,7 @@ load__gene_ko_tpm() %>%
   mutate(Genus = as.character(taxon.split(get("Taxonomy"), 6))) %>%
   ggplot() +
   geom_boxplot(
-    aes_string(x = "Group", y = "TPM", fill = "Group")
+    aes_string(x = "Group", y = "GPM", fill = "Group")
   ) +
   facet_grid(formula("Cluster + Genus + Genome ~ KO")) +
   scale_y_log10(
@@ -773,7 +803,7 @@ load__gene_ko_tpm() %>%
   mutate(Genus = as.character(taxon.split(get("Taxonomy"), 6))) %>%
   ggplot() +
   geom_boxplot(
-    aes_string(x = "Group", y = "TPM", fill = "Group")
+    aes_string(x = "Group", y = "GPM", fill = "Group")
   ) +
   facet_grid(formula("Cluster + Genus + Genome ~ KO + Label")) +
   scale_y_log10(

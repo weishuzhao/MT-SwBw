@@ -169,3 +169,35 @@ for (min_weight in c(0.3, 0.4, 0.5, 0.7, 0.8)) {
   title(str_glue("genome co-occurence with min edge weight {min_weight}"))
 }
 ```
+
+
+```{r mag_abd_spaa, fig.width=12, fig.height=12}
+genome_rltabd %>%
+  filter(taxon.split(get("Taxonomy"), 3) == "Nitrososphaeria") %>%
+  pivot_wider(
+    id_cols = "Genome", names_from = "Layer",
+    values_from = "Relative_abundance", values_fill = 0
+  ) %>%
+  column_to_rownames("Genome") %>%
+  {
+    otu <- .
+    spaa::niche.overlap.boot.pair(otu[, 1], otu[, 2], method = "levins")
+    otu_pairs <- combn(rownames(.), 2) %>%
+      apply(
+        2,
+        function(g1g2) c(g1 = g1g2[1], g2 = g1g2[2])
+      ) %>%
+      t() %>%
+      as.data.frame()
+    otu_pairs %>%
+      apply(
+        1,
+        function(g1g2) spaa::niche.overlap.boot.pair(
+          otu[g1g2[1], ], otu[g1g2[2], ], method = "levins", times = 99
+        )
+      ) %>%
+      t() %>%
+      as.data.frame() %>%
+      cbind(otu_pairs, .)
+  }
+```

@@ -1,8 +1,8 @@
 ###
 #* @Date: 2022-02-27 16:52:29
 #' @LastEditors: Hwrn hwrn.aou@sjtu.edu.cn
-#' @LastEditTime: 2023-04-13 20:45:53
-#' @FilePath: /2022_09-M_mem/workflow/utils/libs/metaSC/R/RLib/R/div.otu.r
+#' @LastEditTime: 2024-05-24 17:26:18
+#' @FilePath: /2021_09-MT10kSW/workflow/utils/RLib/R/div.otu.r
 #* @Description:
 ###
 
@@ -245,8 +245,8 @@ plot.beta.div <- function(div.otu, # nolint: object_name_linter.
   )
   # <<-<<                                                                 <<-<<
   title_adonis_sgnf <- paste0(
-    "ADONIS",
-    " R^2=", round(group_adonis2$F[1], 4),
+    "PERMANOVA",
+    " R^2=", round(group_adonis2$R2[1], 4),
     " p(Pr(>F))=", group_adonis2$`Pr(>F)`[1]
   )
 
