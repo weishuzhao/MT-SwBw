@@ -1,7 +1,7 @@
 ###
 #' @Date: 2022-07-20 13:43:25
 #' @LastEditors: Hwrn hwrn.aou@sjtu.edu.cn
-#' @LastEditTime: 2024-05-24 17:44:16
+#' @LastEditTime: 2024-05-29 16:14:48
 #' @FilePath: /2021_09-MT10kSW/workflow/others/draw_supp_fig1.r
 #' @Description:
 ###
@@ -34,7 +34,6 @@ sample_meta_cross <-
   ) %>%
   merge(unique(sample_meta[c("Location", "Group")])) %>%
   mutate(Group = factor(get("Group"), names(sample_meta_col))) %>%
-  .[order(.$Group, .$Sample), ] %>%
   mutate(
     Group = as.character(get("Group")),
     Layer = .data$Layer %>%
@@ -44,19 +43,20 @@ sample_meta_cross <-
           "TY.035" = "Ss1",
           "TY.044" = "Ss2",
           "TY.048" = "Ss3",
-          "TY.041" = "Ss6",
+          "TY.041" = "Ss5",
           "WQ.022" = "Bw1",
           "YW.019" = "Bw3",
           "YW.020" = "Bw5",
           "YW.023" = "Bw7",
           "TY.042" = "Bs1",
           "TY.038" = "Bs2",
-          "TY.039" = "Bs15",
-          "TY.046" = "Bs21"
+          "TY.039" = "Bs6",
+          "TY.046" = "Bs8"
         ),
         .
       )
-  )
+  ) %>%
+  arrange(-rank(.data$Group), .data$Layer)
 
 cross_rltabd <-
   otu_class_abd %>%

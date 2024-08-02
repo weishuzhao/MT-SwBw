@@ -1,7 +1,7 @@
 ###
 #' @Date: 2022-07-20 13:43:25
 #' @LastEditors: Hwrn hwrn.aou@sjtu.edu.cn
-#' @LastEditTime: 2024-05-24 13:42:15
+#' @LastEditTime: 2024-05-29 15:39:26
 #' @FilePath: /2021_09-MT10kSW/workflow/others/draw_fig2.r
 #' @Description:
 ###
@@ -175,15 +175,26 @@ p1s <- {
 list("jaccard" = "jaccard", "bray" = "bray") %>%
   lapply(
     function(dist) {
-      g1 <- sample_meta_cross %>%
-        mutate(Grouper = paste0(.data$Group, "-", .data$Type)) %>%
-        .[c("Sample", "Grouper")] %>%
-        column_to_rownames("Sample")
-      group_adonis2 <- vegan::adonis2(formula("cross_rltabd ~ Grouper"), g1,
-        method = dist, binary = dist == "jaccard", by = "margin"
+      g2 <- sample_meta_cross %>%
+        mutate(
+          water_sediment = gsub("^[BS]", "", .data$Group)
+        ) %>%
+        .[c("Sample", "Group", "Location", "water_sediment", "Type")] %>%
+        column_to_rownames("Sample") %>%
+        .[rownames(cross_rltabd), ]
+      g1 <- data.frame(Location = sapply(
+        rownames(cross_rltabd),
+        function(x) {
+          unlist(strsplit(x, "\\_"))[1]
+        }
+      ))
+      group_adonis2 <- vegan::adonis2(
+        formula("cross_rltabd ~ Group * Type"),
+        g2,
+        method = dist, binary = dist == "jaccard"
       )
       paste0(
-        "ADONIS",
+        "PERMANOVA",
         " R^2=", round(group_adonis2$R2[1], 4),
         " p(Pr(>F))=", group_adonis2$`Pr(>F)`[1]
       ) %>% print()

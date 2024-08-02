@@ -1,8 +1,8 @@
 ###
 #' @Date: 2023-09-12 23:12:57
 #' @LastEditors: Hwrn hwrn.aou@sjtu.edu.cn
-#' @LastEditTime: 2023-09-13 21:43:56
-#' @FilePath: /2021_09-MT10kSW/workflow/others/draw_supp_fig3.r
+#' @LastEditTime: 2024-05-29 16:39:07
+#' @FilePath: /2021_09-MT10kSW/workflow/others/draw_supp_fig2.r
 #' @Description:
 ###
 source("workflow/utils/RLib.local/R/init.r", chdir = TRUE)
@@ -19,8 +19,9 @@ otu_count_file <- argv[2]
 fig_out <- argv[3]
 
 ##### GLOBAL CONST vars                                                    #####
-share_col <-
-  c("Water only" = "#66E5FF", "Share" = "#91B2BE", "Sediment only" = "#DBD4C5")
+share_col <- c(
+  "Water only" = "#66E5FF", "Share" = "#91B2BE", "Sediment only" = "#DBD4C5"
+)
 
 # depressed
 group1_col <- c(
@@ -49,8 +50,10 @@ axis_ticks_length <- 0.1
 genome_taxonomy <- load__genome_taxonomy(load__Stdb(), load__Wtdb())
 genome_rltabd <- get_relative_abundance(wtdb_abd, genome_taxonomy)
 
-sample_meta_cross <-
-  read.csv("results/reads_diversity/metadata.tsv", sep = "\t", as.is = TRUE) %>%
+sample_meta_cross <- read.csv(
+  "results/reads_diversity/metadata.tsv",
+  sep = "\t", as.is = TRUE
+) %>%
   mutate(
     X = get("Sample"),
     Layer = ifelse(
@@ -60,15 +63,70 @@ sample_meta_cross <-
   ) %>%
   merge(unique(sample_meta[c("Location", "Group")])) %>%
   mutate(Group = factor(get("Group"), names(sample_meta_col))) %>%
-  .[order(.$Group, .$Sample), ] %>%
-  mutate(Group = as.character(get("Group")))
+  mutate(
+    Group = as.character(get("Group")),
+    Layer = .data$Layer %>%
+      `[`(
+        c(
+          "TY.044..water" = "Sw1",
+          "TY.041..water" = "Sw2",
+          "TY.040..water" = "Sw3",
+          "T1L6..R1.0-3" = "Ss4a",
+          "T1L6..R2.0-3" = "Ss4b",
+          "T1B10..0-2" = "Ss6a",
+          "T1B10..36-38" = "Ss6b",
+          "T1B10..44-46" = "Ss6c",
+          "T1B11..0-3" = "Ss7",
+          "WQ.022..water" = "Bw1",
+          "WQ.024..water" = "Bw2",
+          "YW.019..water" = "Bw3",
+          "YW.021..water" = "Bw4",
+          "YW.020..water" = "Bw5",
+          "WQ.021..water" = "Bw6",
+          "YW.023..water" = "Bw7",
+          "T1L10..0-3" = "Bs3a",
+          "T1L10..6-9" = "Bs3b",
+          "T1L10..12-15" = "Bs3c",
+          "T1L10..18-21" = "Bs3d",
+          "T3L11..0-3" = "Bs4a",
+          "T3L11..6-9" = "Bs4b",
+          "T3L11..12-15" = "Bs4c",
+          "T3L11..18-21" = "Bs4d",
+          "T3L8..0-3" = "Bs5a",
+          "T3L8..6-9" = "Bs5b",
+          "T3L8..12-15" = "Bs5c",
+          "T3L8..18-21" = "Bs5d",
+          "T3L14..0-2" = "Bs7a",
+          "T3L14..4-6" = "Bs7b",
+          "T3L14..6-8" = "Bs7c",
+          "T3L14..12-14" = "Bs7d",
+          "T3L14..18-20" = "Bs7e",
+          "TY.040" = "Sw3",
+          "TY.035" = "Ss1",
+          "TY.044" = "Ss2",
+          "TY.048" = "Ss3",
+          "TY.041" = "Ss5",
+          "WQ.022" = "Bw1",
+          "YW.019" = "Bw3",
+          "YW.020" = "Bw5",
+          "YW.023" = "Bw7",
+          "TY.042" = "Bs1",
+          "TY.038" = "Bs2",
+          "TY.039" = "Bs6",
+          "TY.046" = "Bs8",
+          NULL
+        ),
+        .
+      )
+  ) %>%
+  arrange(-rank(.data$Group), .data$Layer)
 
-otu_count <-
-  otu_count_file %>%
+otu_count <- otu_count_file %>%
   {
     df <- read.csv(., sep = "\t")
-    colnames(df) <-
-      c("SpeciesID", read.csv(., sep = "\t", header = FALSE)[1, -1])
+    colnames(df) <- c(
+      "SpeciesID", read.csv(., sep = "\t", header = FALSE)[1, -1]
+    )
     df
   } %>%
   pivot_longer(
@@ -77,7 +135,7 @@ otu_count <-
     values_to = "ReadsCount"
   ) %>%
   filter(get("ReadsCount") > 0) %>%
-  merge(
+  left_join(
     "results/reads_diversity/classification.tsv" %>%
       read.csv(sep = "\t") %>%
       mutate(
@@ -90,14 +148,13 @@ otu_count <-
       ) %>%
       dplyr::select(c("SpeciesID", "Taxonomy"))
   ) %>%
-  merge(sample_meta_cross)
+  left_join(sample_meta_cross)
 
 ### ######################################################################## ###
 #### Define function AND Calculate data                                     ####
 ### ######################################################################## ###
 ##### Define function                                                      #####
-assign_share <-
-  . %>%
+assign_share <- . %>%
   gsub("^(Bw|Sw)$", "Water only", .) %>%
   gsub("^(Bs|Ss)$", "Sediment only", .) %>%
   unique() %>%
@@ -107,8 +164,7 @@ assign_share <-
   factor(names(share_col) %>% rev())
 
 ##### Calculate data                                                       #####
-otu_rltabd <-
-  otu_count %>%
+otu_rltabd <- otu_count %>%
   group_by(Sample = get("Sample")) %>%
   mutate(Abundance = get("ReadsCount") / sum(get("ReadsCount")) * 100)
 
@@ -117,13 +173,17 @@ otu_rltabd <-
 ### ######################################################################## ###
 ##### Plot figures                                                         #####
 
-p1 <-
-  genome_rltabd %>%
+p1 <- genome_rltabd %>%
   group_by(Genome = get("Genome")) %>%
   mutate(Group1 = assign_share(get("Group"))) %>%
   group_by(
     Group1 = get("Group1"),
-    Site = get("Site"), Layer = get("Layer"),
+    Site = get("Site"),
+    Layer = .data$Layer %>%
+      `[`(
+        `names<-`(sample_meta_cross$Layer, sample_meta_cross$X),
+        .
+      ),
     Sample = get("Sample"), Group = get("Group")
   ) %>%
   summarise(Abundance = sum(get("Relative_abundance"))) %>%
@@ -134,13 +194,12 @@ p1 <-
     labs.y = "MAG prevalence"
   ) +
   scale_x_discrete(
-    limits =
-      sample_meta[c("Site", "Layers")] %>% # nolint
-        apply(1, . %>% paste(collapse = "..")) # nolint
+    limits = sample_meta_cross %>%
+      filter(.data$Type == "metagenome") %>%
+      .$Layer
   ) +
   theme(axis.text.x = element_text(color = sample_meta_col[sample_meta$Group]))
-p2 <-
-  otu_rltabd %>%
+p2 <- otu_rltabd %>%
   group_by(SpeciesID = get("SpeciesID")) %>%
   mutate(Group1 = assign_share(get("Group"))) %>%
   group_by(
@@ -166,10 +225,9 @@ p2 <-
     )
   )
 
-p2_x <-
-  p1 + p2 + guide_area() +
-    plot_layout(design = "AAA\nBBC", guides = "collect") &
-    scale_fill_manual(values = share_col)
+p2_x <- p1 + p2 + guide_area() +
+  plot_layout(design = "AAA\nBBC", guides = "collect") &
+  scale_fill_manual(values = share_col)
 
 ##### OUTPUT                                                               #####
 ggsave(filename = fig_out, plot = p2_x, width = 6, height = 8)
